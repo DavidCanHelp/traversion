@@ -9,7 +9,7 @@ import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import logger from '../utils/logger.js';
-import { GitIntegration } from '../integrations/git.js';
+import { SecureGitIntegration } from '../security/secureGitIntegration.js';
 import smartTagger from '../utils/smartTagger.js';
 import WebRTCSignalingServer from '../collaboration/webrtc-server.js';
 
@@ -41,7 +41,7 @@ class TraversionWatcher {
     }
 
     this.store = new VersionStore(path.join(traversionDir, 'versions.db'));
-    this.git = new GitIntegration(this.watchPath);
+    this.git = new SecureGitIntegration(this.watchPath);
     this.clients = new Set();
     this.recentVersions = [];
     this.spinner = null;
@@ -93,7 +93,7 @@ class TraversionWatcher {
       });
   }
 
-  handleFileChange(filePath) {
+  async handleFileChange(filePath) {
     if (!this.shouldTrackFile(filePath)) return;
 
     const relativePath = path.relative(this.watchPath, filePath);
@@ -111,7 +111,7 @@ class TraversionWatcher {
       };
       
       // Enrich with git metadata
-      metadata = this.git.enrichVersionMetadata(metadata, filePath);
+      metadata = await this.git.enrichVersionMetadata(metadata, filePath);
       
       const versionId = this.store.saveVersion(relativePath, content, metadata);
 
@@ -268,24 +268,41 @@ class TraversionWatcher {
     });
 
     // Git status endpoint
-    app.get('/api/git/status', (req, res) => {
+    app.get('/api/git/status', async (req, res) => {
       if (!this.git.isGitRepo) {
         return res.json({ isGitRepo: false });
       }
       
-      res.json({
-        isGitRepo: true,
-        branch: this.git.getCurrentBranch(),
-        commit: this.git.getCurrentCommit(),
-        uncommittedFiles: this.git.getUncommittedFiles(),
-        remoteUrl: this.git.getRemoteUrl()
-      });
+      try {
+        const [branch, commit, uncommittedFiles, remoteUrl] = await Promise.all([
+          this.git.getCurrentBranch(),
+          this.git.getCurrentCommit(),
+          this.git.getUncommittedFiles(),
+          this.git.getRemoteUrl()
+        ]);
+        
+        res.json({
+          isGitRepo: true,
+          branch,
+          commit,
+          uncommittedFiles,
+          remoteUrl
+        });
+      } catch (error) {
+        logger.error('Git status error', { error: error.message });
+        res.status(500).json({ error: 'Failed to get git status' });
+      }
     });
     
-    app.get('/api/git/history/:file', (req, res) => {
-      const filePath = path.join(this.watchPath, req.params.file);
-      const history = this.git.getFileHistory(filePath);
-      res.json(history);
+    app.get('/api/git/history/:file', async (req, res) => {
+      try {
+        const filePath = path.join(this.watchPath, req.params.file);
+        const history = await this.git.getFileHistory(filePath);
+        res.json(history);
+      } catch (error) {
+        logger.error('Git history error', { error: error.message });
+        res.status(500).json({ error: 'Failed to get file history' });
+      }
     });
     
     // Stats endpoint

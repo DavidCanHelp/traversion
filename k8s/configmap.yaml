@@ -1,0 +1,115 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traversion-config
+  namespace: traversion-system
+  labels:
+    app.kubernetes.io/name: traversion
+    app.kubernetes.io/component: config
+data:
+  PORT: "3333"
+  WS_PORT: "3334"
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+  METRICS_PORT: "9090"
+  HEALTH_CHECK_PATH: "/api/health"
+  API_VERSION: "v1"
+  MAX_FILE_SIZE: "50MB"
+  RATE_LIMIT_WINDOW: "900000"
+  RATE_LIMIT_MAX: "1000"
+  SESSION_TIMEOUT: "3600000"
+  BACKUP_RETENTION_DAYS: "30"
+  EXPORT_MAX_ROWS: "1000000"
+  TELEMETRY_SAMPLE_RATE: "0.1"
+  CORS_ORIGIN: "*"
+  COMPRESSION_ENABLED: "true"
+  HELMET_ENABLED: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traversion-db-init
+  namespace: traversion-system
+  labels:
+    app.kubernetes.io/name: traversion
+    app.kubernetes.io/component: database
+data:
+  init.sql: |
+    -- Initialize TimescaleDB extensions
+    CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+    
+    -- Create traversion database if not exists
+    SELECT 'CREATE DATABASE traversion'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'traversion');
+    
+    \c traversion;
+    
+    -- Enable TimescaleDB
+    CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+    
+    -- Create tables
+    CREATE TABLE IF NOT EXISTS tenants (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(255) NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      settings JSONB DEFAULT '{}'::jsonb
+    );
+    
+    CREATE TABLE IF NOT EXISTS events (
+      id BIGSERIAL,
+      tenant_id UUID NOT NULL REFERENCES tenants(id),
+      timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      event_type VARCHAR(100) NOT NULL,
+      file_path TEXT NOT NULL,
+      content_hash VARCHAR(64),
+      metadata JSONB DEFAULT '{}'::jsonb,
+      PRIMARY KEY (timestamp, id)
+    );
+    
+    CREATE TABLE IF NOT EXISTS causality (
+      id BIGSERIAL,
+      tenant_id UUID NOT NULL REFERENCES tenants(id),
+      timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      parent_event_id BIGINT,
+      child_event_id BIGINT NOT NULL,
+      relationship_type VARCHAR(50) NOT NULL,
+      confidence_score FLOAT DEFAULT 1.0,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      PRIMARY KEY (timestamp, id)
+    );
+    
+    CREATE TABLE IF NOT EXISTS patterns (
+      id BIGSERIAL,
+      tenant_id UUID NOT NULL REFERENCES tenants(id),
+      timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      pattern_type VARCHAR(100) NOT NULL,
+      pattern_data JSONB NOT NULL,
+      confidence_score FLOAT DEFAULT 1.0,
+      occurrence_count INTEGER DEFAULT 1,
+      PRIMARY KEY (timestamp, id)
+    );
+    
+    CREATE TABLE IF NOT EXISTS metrics (
+      id BIGSERIAL,
+      tenant_id UUID NOT NULL REFERENCES tenants(id),
+      timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      metric_name VARCHAR(100) NOT NULL,
+      metric_value DOUBLE PRECISION NOT NULL,
+      tags JSONB DEFAULT '{}'::jsonb,
+      PRIMARY KEY (timestamp, id)
+    );
+    
+    -- Convert to hypertables
+    SELECT create_hypertable('events', 'timestamp', if_not_exists => TRUE);
+    SELECT create_hypertable('causality', 'timestamp', if_not_exists => TRUE);
+    SELECT create_hypertable('patterns', 'timestamp', if_not_exists => TRUE);
+    SELECT create_hypertable('metrics', 'timestamp', if_not_exists => TRUE);
+    
+    -- Create indices for better performance
+    CREATE INDEX IF NOT EXISTS events_tenant_type_idx ON events (tenant_id, event_type);
+    CREATE INDEX IF NOT EXISTS events_file_path_idx ON events (file_path);
+    CREATE INDEX IF NOT EXISTS causality_tenant_idx ON causality (tenant_id);
+    CREATE INDEX IF NOT EXISTS patterns_tenant_type_idx ON patterns (tenant_id, pattern_type);
+    CREATE INDEX IF NOT EXISTS metrics_tenant_name_idx ON metrics (tenant_id, metric_name);

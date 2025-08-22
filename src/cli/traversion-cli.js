@@ -8,6 +8,10 @@ import Table from 'cli-table3';
 import { createReadStream, writeFileSync } from 'fs';
 import { pipeline } from 'stream/promises';
 import path from 'path';
+import { IncidentAnalyzer } from '../forensics/incidentAnalyzer.js';
+import { GitHubIntegration } from '../integrations/githubIntegration.js';
+import { IncidentSimulator } from '../training/incidentSimulator.js';
+import { PatternLearner } from '../learning/patternLearner.js';
 
 class TraversionCLI {
   constructor() {
@@ -18,7 +22,7 @@ class TraversionCLI {
   setupCommands() {
     program
       .name('trav')
-      .description('Traversion CLI - Time travel through your code versions')
+      .description('Traversion CLI - Post-incident forensics and code review analysis')
       .version('1.0.0');
     
     // Timeline command
@@ -119,6 +123,67 @@ class TraversionCLI {
       .description('Check if Traversion server is running')
       .action(async () => {
         await this.checkStatus();
+      });
+    
+    // Incident forensics command
+    program
+      .command('incident')
+      .description('Analyze an incident using git history')
+      .option('-t, --time <time>', 'Incident time (ISO string or relative like "2 hours ago")')
+      .option('-h, --hours <hours>', 'Hours to look back', '24')
+      .option('-f, --files <files>', 'Comma-separated list of affected files')
+      .action(async (options) => {
+        await this.analyzeIncident(options);
+      });
+    
+    // PR analysis command
+    program
+      .command('pr <owner>/<repo>/<number>')
+      .description('Analyze a GitHub Pull Request for risk and impact')
+      .option('--comment', 'Post analysis as PR comment')
+      .action(async (prSpec, options) => {
+        await this.analyzePR(prSpec, options);
+      });
+    
+    // Quick forensics command
+    program
+      .command('forensics')
+      .description('Interactive incident analysis')
+      .action(async () => {
+        await this.runForensics();
+      });
+    
+    // Analyze command for specific files/commits
+    program
+      .command('analyze')
+      .description('Analyze specific commits or file changes')
+      .option('-c, --commits <commits>', 'Comma-separated commit hashes')
+      .option('-f, --files <files>', 'Comma-separated file paths')
+      .option('--since <since>', 'Analyze commits since date/time')
+      .action(async (options) => {
+        await this.analyzeChanges(options);
+      });
+    
+    // Training command
+    program
+      .command('train')
+      .description('Start incident response training')
+      .option('-s, --scenario <scenario>', 'Scenario ID (config-error, database-migration, etc.)')
+      .option('-m, --mode <mode>', 'Training mode (guided, challenge, assessment)', 'guided')
+      .option('-p, --participant <id>', 'Participant ID for tracking')
+      .option('-l, --list', 'List available scenarios')
+      .action(async (options) => {
+        await this.runTraining(options);
+      });
+    
+    // Pattern learning command
+    program
+      .command('learn')
+      .description('Analyze patterns from historical incidents')
+      .option('--from <incident>', 'Learn from specific incident data')
+      .option('--stats', 'Show pattern learning statistics')
+      .action(async (options) => {
+        await this.runPatternLearning(options);
       });
   }
   
@@ -552,10 +617,51 @@ class TraversionCLI {
     return chalk.red(`${percent}%`);
   }
   
-  run() {
-    program.parse();
-  }
-}
+  async analyzeIncident(options) {
+    const analyzer = new IncidentAnalyzer();
+    
+    let incidentTime;
+    if (options.time) {
+      if (options.time.includes('ago')) {
+        // Handle relative time like "2 hours ago"
+        const match = options.time.match(/(\d+)\s*(hour|day|minute)s?\s*ago/);
+        if (match) {
+          const [, amount, unit] = match;
+          const now = new Date();
+          const multiplier = unit === 'hour' ? 60 * 60 * 1000 : 
+                           unit === 'day' ? 24 * 60 * 60 * 1000 : 
+                           60 * 1000; // minutes
+          incidentTime = new Date(now.getTime() - (parseInt(amount) * multiplier));
+        } else {
+          incidentTime = new Date();
+        }
+      } else {
+        incidentTime = new Date(options.time);
+      }
+    } else {
+      incidentTime = new Date();
+    }
+    
+    const affectedFiles = options.files ? options.files.split(',').map(f => f.trim()) : [];
+    const lookbackHours = parseInt(options.hours);
+    
+    const spinner = ora('🔍 Analyzing incident...').start();
+    
+    try {
+      const analysis = await analyzer.analyzeIncident(incidentTime, lookbackHours, affectedFiles);
+      spinner.stop();
+      
+      console.log(chalk.red('🚨 INCIDENT FORENSICS REPORT'));
+      console.log(chalk.gray('═'.repeat(60)));
+      console.log(`🕐 Incident Time: ${chalk.yellow(analysis.incidentTime.toISOString())}`);
+      console.log(`📅 Analysis Window: ${chalk.gray(lookbackHours)} hours`);
+      console.log(`🔍 Suspicious Commits: ${chalk.red(analysis.suspiciousCommits.length)}`);
+      
+      if (analysis.suspiciousCommits.length === 0) {
+        console.log(chalk.yellow('\\n✨ No suspicious commits found in the timeframe.'));\n        return;\n      }
+      
+      console.log('\\n🎯 TOP SUSPECTS:');\n      
+      analysis.suspiciousCommits.slice(0, 5).forEach((commit, index) => {\n        const riskEmoji = commit.riskScore > 0.7 ? '🚨' : commit.riskScore > 0.4 ? '⚠️' : '🟡';\n        console.log(`${index + 1}. ${riskEmoji} ${chalk.red(commit.shortHash)} ${chalk.white(commit.message)}`);\n        console.log(`   👤 ${chalk.gray(commit.author)} | ⏰ ${chalk.gray(commit.date.toLocaleString())}`);\n        console.log(`   📊 Risk: ${chalk.yellow((commit.riskScore * 100).toFixed(0))}% | Files: ${commit.filesChanged.length} | +${commit.linesChanged.additions}/-${commit.linesChanged.deletions}`);\n        if (commit.riskFactors.length > 0) {\n          console.log(`   🏷️ ${chalk.red(commit.riskFactors.join(', '))}`);\n        }\n        console.log('');\n      });\n      \n      console.log('📈 IMPACT ANALYSIS:');\n      console.log(`   🔢 Total Suspicious: ${analysis.impactAnalysis.totalSuspiciousCommits}`);\n      console.log(`   🚨 High Risk: ${analysis.impactAnalysis.highRiskCommits}`);\n      console.log(`   👥 Authors Involved: ${analysis.impactAnalysis.authorsInvolved}`);\n      console.log(`   📁 Files Impacted: ${analysis.impactAnalysis.filesImpacted.size}`);\n      \n      if (Object.keys(analysis.impactAnalysis.commonPatterns).length > 0) {\n        console.log('\\n🔍 COMMON PATTERNS:');\n        Object.entries(analysis.impactAnalysis.commonPatterns)\n          .sort(([,a], [,b]) => b - a)\n          .forEach(([pattern, count]) => {\n            console.log(`   • ${chalk.yellow(pattern)}: ${count} commits`);\n          });\n      }\n      \n      console.log('\\n💡 RECOMMENDATIONS:');\n      analysis.recommendations.forEach(rec => {\n        const emoji = rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🔵';\n        console.log(`${emoji} ${chalk.white.bold(rec.category.toUpperCase())}: ${rec.message}`);\n      });\n      \n    } catch (error) {\n      spinner.fail(chalk.red('Incident analysis failed: ' + error.message));\n    }\n  }\n  \n  async analyzePR(prSpec, options) {\n    const [owner, repo, number] = prSpec.split('/');\n    const integration = new GitHubIntegration();\n    \n    const spinner = ora(`🔍 Analyzing PR #${number}...`).start();\n    \n    try {\n      const analysis = await integration.analyzePullRequest(owner, repo, parseInt(number));\n      spinner.stop();\n      \n      const riskEmoji = analysis.riskScore > 0.7 ? '🚨' : analysis.riskScore > 0.4 ? '⚠️' : '✅';\n      \n      console.log(chalk.cyan('\\n📋 PULL REQUEST ANALYSIS'));\n      console.log(chalk.gray('═'.repeat(60)));\n      console.log(`${riskEmoji} ${chalk.white.bold(`PR #${analysis.pr.number}: ${analysis.pr.title}`)}`);\n      console.log(`👤 Author: ${chalk.gray(analysis.pr.author)}`);\n      console.log(`📊 Risk Score: ${chalk.yellow((analysis.riskScore * 100).toFixed(0))}%`);\n      console.log(`📈 Changes: +${chalk.green(analysis.pr.additions)} -${chalk.red(analysis.pr.deletions)} (${analysis.pr.changedFiles} files)`);\n      \n      console.log('\\n📊 IMPACT ASSESSMENT:');\n      console.log(`   Scope: ${analysis.impactAssessment.scope}`);\n      console.log(`   Complexity: ${analysis.impactAssessment.complexity}`);\n      \n      if (analysis.impactAssessment.riskAreas.length > 0) {\n        console.log(`   Risk Areas: ${chalk.red(analysis.impactAssessment.riskAreas.join(', '))}`);\n      }\n      \n      console.log('\\n🧪 TESTING RECOMMENDATIONS:');\n      analysis.impactAssessment.testingNeeds.forEach(need => {\n        console.log(`   • ${need}`);\n      });\n      \n      if (analysis.recommendations.length > 0) {\n        console.log('\\n💡 RECOMMENDATIONS:');\n        analysis.recommendations.forEach(rec => {\n          const emoji = rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🔵';\n          console.log(`${emoji} ${chalk.white.bold(rec.category.toUpperCase())}: ${rec.message}`);\n        });\n      }\n      \n      if (analysis.reviewSuggestions.length > 0) {\n        console.log('\\n👀 REVIEW SUGGESTIONS:');\n        analysis.reviewSuggestions.forEach(suggestion => {\n          console.log(`   • ${chalk.white.bold(suggestion.category.toUpperCase())}: ${suggestion.message}`);\n        });\n      }\n      \n      if (options.comment) {\n        const commentSpinner = ora('📝 Posting analysis as PR comment...').start();\n        try {\n          const comment = integration.formatAnalysisComment(analysis);\n          await integration.addPRComment(owner, repo, parseInt(number), comment);\n          commentSpinner.succeed(chalk.green('✅ Analysis posted as PR comment'));\n        } catch (error) {\n          commentSpinner.fail(chalk.red('Failed to post comment: ' + error.message));\n        }\n      }\n      \n    } catch (error) {\n      spinner.fail(chalk.red('PR analysis failed: ' + error.message));\n    }\n  }\n  \n  async runForensics() {\n    console.log(chalk.cyan.bold('\\n🕵️ TRAVERSION INCIDENT FORENSICS'));\n    console.log(chalk.gray('Interactive investigation mode'));\n    console.log(chalk.gray('═'.repeat(60)));\n    \n    // Simple prompts without readline\n    console.log('\\n📝 Please provide incident details:\\n');\n    console.log('Example usage:');\n    console.log('  trav incident --time \"2 hours ago\" --hours 48');\n    console.log('  trav incident --time \"2023-12-01T15:30:00Z\" --files \"server.js,config.yml\"');\n    console.log('  trav pr owner/repo/123 --comment');\n    console.log('');\n    console.log('For immediate analysis, try:');\n    console.log(chalk.yellow('  trav incident --time \"1 hour ago\" --hours 24'));\n  }\n  \n  async analyzeChanges(options) {\n    const analyzer = new IncidentAnalyzer();\n    const spinner = ora('🔍 Analyzing changes...').start();\n    \n    try {\n      if (options.commits) {\n        const commits = options.commits.split(',').map(c => c.trim());\n        spinner.text = `Analyzing ${commits.length} commits...`;\n        \n        for (const commitHash of commits) {\n          try {\n            const commitAnalysis = await analyzer.analyzeCommit({hash: commitHash}, []);\n            console.log(`\\n🔍 ${chalk.yellow(commitHash.substring(0, 8))}: ${commitAnalysis.message}`);\n            console.log(`   Risk: ${chalk.red((commitAnalysis.riskScore * 100).toFixed(0))}% | Files: ${commitAnalysis.filesChanged.length}`);\n            if (commitAnalysis.riskFactors.length > 0) {\n              console.log(`   Factors: ${chalk.yellow(commitAnalysis.riskFactors.join(', '))}`);\n            }\n          } catch (error) {\n            console.log(`\\n❌ Error analyzing ${commitHash}: ${error.message}`);\n          }\n        }\n      } else if (options.since) {\n        const since = new Date(options.since);\n        const commits = await analyzer.getCommitsInTimeframe(since, new Date());\n        console.log(`\\n📅 Found ${commits.length} commits since ${since.toISOString()}`);\n        \n        const analyses = [];\n        for (const commit of commits.slice(0, 20)) { // Limit to recent 20\n          const analysis = await analyzer.analyzeCommit(commit, []);\n          if (analysis.riskScore > 0.2) {\n            analyses.push(analysis);\n          }\n        }\n        \n        analyses.sort((a, b) => b.riskScore - a.riskScore);\n        console.log(`\\n🎯 ${analyses.length} commits with notable risk:`);\n        \n        analyses.slice(0, 10).forEach(commit => {\n          const riskEmoji = commit.riskScore > 0.7 ? '🚨' : commit.riskScore > 0.4 ? '⚠️' : '🟡';\n          console.log(`${riskEmoji} ${chalk.red(commit.shortHash)} ${chalk.white(commit.message)}`);\n          console.log(`   Risk: ${chalk.yellow((commit.riskScore * 100).toFixed(0))}% | ${chalk.gray(commit.author)}`);\n        });\n      }\n      \n      spinner.stop();\n      \n    } catch (error) {\n      spinner.fail(chalk.red('Analysis failed: ' + error.message));\n    }\n  }\n\n  async runTraining(options) {\n    if (options.list) {\n      const simulator = new IncidentSimulator();\n      const scenarios = simulator.getAvailableScenarios();\n      \n      console.log(chalk.cyan.bold('\\n🎓 Available Training Scenarios\\n'));\n      \n      const table = new Table({\n        head: ['ID', 'Name', 'Severity', 'Duration', 'Description'],\n        colWidths: [15, 25, 10, 10, 40]\n      });\n      \n      scenarios.forEach(scenario => {\n        table.push([\n          scenario.id,\n          scenario.name,\n          scenario.severity.toUpperCase(),\n          `${scenario.duration}m`,\n          this.truncate(scenario.description, 38)\n        ]);\n      });\n      \n      console.log(table.toString());\n      console.log('\\nUsage: trav train --scenario <id> --mode <mode>');\n      console.log('Modes: guided (default), challenge, assessment\\n');\n      return;\n    }\n\n    if (!options.scenario) {\n      console.log(chalk.yellow('Please specify a scenario with --scenario or use --list to see available scenarios'));\n      return;\n    }\n\n    const simulator = new IncidentSimulator();\n    const spinner = ora(`🎓 Starting ${options.mode} training session...`).start();\n    \n    try {\n      spinner.stop();\n      await simulator.runTrainingSession(options.scenario, {\n        mode: options.mode,\n        participantId: options.participant\n      });\n    } catch (error) {\n      spinner.fail(chalk.red('Training session failed: ' + error.message));\n    }\n  }\n\n  async runPatternLearning(options) {\n    const learner = new PatternLearner();\n    \n    if (options.stats) {\n      const spinner = ora('📊 Loading pattern statistics...').start();\n      \n      try {\n        const summary = learner.getPatternSummary();\n        spinner.stop();\n        \n        console.log(chalk.cyan.bold('\\n🧠 Pattern Learning Statistics\\n'));\n        console.log(`Total Incidents Analyzed: ${chalk.green(summary.totalIncidents)}`);\n        console.log(`Last Updated: ${chalk.gray(new Date(summary.lastUpdated).toLocaleString())}\\n`);\n        \n        if (summary.topRiskFiles.length > 0) {\n          console.log(chalk.white.bold('🔥 Top Risk Files:'));\n          summary.topRiskFiles.forEach(file => {\n            console.log(`   • ${chalk.red(file.file)} - ${file.incidentCount} incidents (${(file.confidence * 100).toFixed(0)}% confidence)`);\n          });\n          console.log('');\n        }\n        \n        if (summary.riskiestHours.length > 0) {\n          console.log(chalk.white.bold('⏰ Riskiest Hours:'));\n          summary.riskiestHours.forEach(hour => {\n            console.log(`   • ${hour.hour}:00 - ${hour.incidentCount} incidents (avg severity: ${hour.avgSeverity.toFixed(1)})`);\n          });\n          console.log('');\n        }\n        \n        if (summary.commonPatterns.length > 0) {\n          console.log(chalk.white.bold('📈 Common Risk Patterns:'));\n          summary.commonPatterns.forEach(pattern => {\n            console.log(`   • ${chalk.yellow(pattern.factor)} - ${pattern.incidentCount} incidents`);\n          });\n        }\n        \n      } catch (error) {\n        spinner.fail(chalk.red('Failed to load pattern statistics: ' + error.message));\n      }\n      return;\n    }\n\n    if (options.from) {\n      const spinner = ora('🧠 Learning from incident data...').start();\n      \n      try {\n        // Parse incident data (could be JSON file or incident ID)\n        let incidentData;\n        \n        try {\n          incidentData = JSON.parse(options.from);\n        } catch {\n          // Try to load as file or fetch from API\n          console.log('Loading incident data from:', options.from);\n          // Implementation would depend on data source\n          spinner.fail(chalk.yellow('Incident data loading not yet implemented'));\n          return;\n        }\n        \n        await learner.learnFromIncident(incidentData);\n        spinner.succeed(chalk.green('✅ Successfully learned from incident data'));\n        \n        console.log(chalk.white('\\nUpdated patterns will be applied to future analyses.'));\n        \n      } catch (error) {\n        spinner.fail(chalk.red('Failed to learn from incident: ' + error.message));\n      }\n      return;\n    }\n\n    // Default: show learning help\n    console.log(chalk.cyan.bold('\\n🧠 Pattern Learning Help\\n'));\n    console.log('Commands:');\n    console.log('  --stats           Show pattern learning statistics');\n    console.log('  --from <data>     Learn from incident data (JSON)');\n    console.log('\\nExamples:');\n    console.log('  trav learn --stats');\n    console.log('  trav learn --from \\'{\"id\":\"inc-123\", \"severity\":\"high\"}\\' ');\n  }\n\n  run() {\n    program.parse();\n  }\n}
 
 // Add global dependencies check
 try {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { VersionStore } from '../src/engine/versionStore.js';
-import { GitIntegration } from '../src/integrations/git.js';
+import { SecureGitIntegration } from '../src/security/secureGitIntegration.js';
 import { Logger } from '../src/utils/logger.js';
 import fs from 'fs';
 import path from 'path';
@@ -136,26 +136,29 @@ describe('Traversion Core Tests', () => {
     });
   });
   
-  describe('GitIntegration', () => {
-    it('should detect non-git repositories', () => {
-      const git = new GitIntegration(testDir);
+  describe('SecureGitIntegration', () => {
+    it('should detect non-git repositories', async () => {
+      const git = new SecureGitIntegration(testDir);
+      await git.initializeRepo();
       expect(git.isGitRepo).toBe(false);
     });
     
-    it('should handle git operations gracefully in non-git repos', () => {
-      const git = new GitIntegration(testDir);
+    it('should handle git operations gracefully in non-git repos', async () => {
+      const git = new SecureGitIntegration(testDir);
+      await git.initializeRepo();
       
-      expect(git.getCurrentBranch()).toBe('main');
-      expect(git.getCurrentCommit()).toBeNull();
-      expect(git.getFileStatus('any-file.js')).toBe('untracked');
-      expect(git.getUncommittedFiles()).toEqual([]);
+      expect(await git.getCurrentBranch()).toBe('main');
+      expect(await git.getCurrentCommit()).toBeNull();
+      expect(await git.getFileStatus('any-file.js')).toBe('untracked');
+      expect(await git.getUncommittedFiles()).toEqual([]);
     });
     
-    it('should enrich metadata correctly', () => {
-      const git = new GitIntegration(testDir);
+    it('should enrich metadata correctly', async () => {
+      const git = new SecureGitIntegration(testDir);
+      await git.initializeRepo();
       const metadata = { vibeTags: ['test'] };
       
-      const enriched = git.enrichVersionMetadata(metadata, 'test.js');
+      const enriched = await git.enrichVersionMetadata(metadata, 'test.js');
       
       expect(enriched.vibeTags).toEqual(['test']);
       expect(enriched.git).toBeDefined();

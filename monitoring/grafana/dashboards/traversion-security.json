@@ -1,0 +1,398 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Traversion Security & Authentication",
+    "tags": ["traversion", "security", "authentication", "audit"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Authentication Attempts",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(traversion_auth_attempts_total[5m])",
+            "interval": "",
+            "legendFormat": "{{tenant_id}} - {{method}} ({{result}})",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Attempts/sec",
+            "min": 0
+          },
+          {
+            "show": false
+          }
+        ],
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true
+        },
+        "seriesOverrides": [
+          {
+            "alias": "/.*failure.*/",
+            "color": "red"
+          },
+          {
+            "alias": "/.*success.*/",
+            "color": "green"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Active Sessions",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "traversion_active_sessions",
+            "interval": "",
+            "legendFormat": "{{tenant_id}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 50},
+                {"color": "red", "value": 200}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Failed Login Rate",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(traversion_auth_attempts_total{result=\"failure\"}[5m]) * 100",
+            "interval": "",
+            "legendFormat": "{{tenant_id}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 15}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Security Events Timeline",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(traversion_events_total{event_type=~\".*auth.*|.*security.*|.*unauthorized.*\"}[5m])",
+            "interval": "",
+            "legendFormat": "{{event_type}} - {{service_id}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Security Events/sec",
+            "min": 0
+          },
+          {
+            "show": false
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [10],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "2m",
+          "frequency": "30s",
+          "handler": 1,
+          "name": "High Security Event Rate",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 5,
+        "title": "API Key Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(traversion_api_key_usage_total[5m])",
+            "interval": "",
+            "legendFormat": "{{tenant_id}} - {{key_name}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Requests/sec",
+            "min": 0
+          },
+          {
+            "show": false
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Permission Violations",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "increase(traversion_permission_violations_total[1h])",
+            "interval": "",
+            "legendFormat": "{{tenant_id}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 20}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Suspicious IP Activity",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 16},
+        "targets": [
+          {
+            "expr": "topk(10, sum by (ip_address) (rate(traversion_auth_attempts_total{result=\"failure\"}[5m])) > 0.1)",
+            "interval": "",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "__name__": true
+              },
+              "renameByName": {
+                "ip_address": "IP Address",
+                "Value": "Failed Attempts/sec"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "User Activity Heatmap",
+        "type": "heatmap",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "sum by (hour) (increase(traversion_auth_attempts_total{result=\"success\"}[1h]))",
+            "interval": "",
+            "legendFormat": "{{hour}}",
+            "refId": "A"
+          }
+        ],
+        "heatmap": {
+          "xBucketSize": "1h",
+          "yBucketSize": 1,
+          "yBucketBound": "upper"
+        }
+      },
+      {
+        "id": 9,
+        "title": "Tenant Access Patterns",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "rate(traversion_http_requests_total[5m])",
+            "interval": "",
+            "legendFormat": "{{tenant_id}} API Calls",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Requests/sec",
+            "min": 0
+          },
+          {
+            "show": false
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "JWT Token Metrics",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "rate(traversion_jwt_issued_total[5m])",
+            "interval": "",
+            "legendFormat": "Issued",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(traversion_jwt_validated_total[5m])",
+            "interval": "",
+            "legendFormat": "Validated",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(traversion_jwt_expired_total[5m])",
+            "interval": "",
+            "legendFormat": "Expired",
+            "refId": "C"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Tokens/sec",
+            "min": 0
+          },
+          {
+            "show": false
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Role Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 32},
+        "targets": [
+          {
+            "expr": "sum by (role) (traversion_user_sessions_by_role)",
+            "interval": "",
+            "legendFormat": "{{role}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["percent"]
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "Audit Log Volume",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 32},
+        "targets": [
+          {
+            "expr": "rate(traversion_audit_events_total[5m])",
+            "interval": "",
+            "legendFormat": "{{action}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Audit Events/sec",
+            "min": 0
+          },
+          {
+            "show": false
+          }
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "tenant",
+          "type": "query",
+          "query": "label_values(traversion_auth_attempts_total, tenant_id)",
+          "refresh": 1,
+          "includeAll": true,
+          "allValue": ".*"
+        },
+        {
+          "name": "time_range",
+          "type": "interval",
+          "query": "1m,5m,10m,30m,1h,6h,12h,1d",
+          "current": {
+            "selected": false,
+            "text": "5m",
+            "value": "5m"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Security Alerts",
+          "datasource": "prometheus",
+          "expr": "ALERTS{alertname=~\"traversion.*security.*|traversion.*auth.*\"}",
+          "titleFormat": "{{alertname}}",
+          "textFormat": "{{severity}}: Security event detected"
+        },
+        {
+          "name": "Failed Login Spikes",
+          "datasource": "prometheus",
+          "expr": "rate(traversion_auth_attempts_total{result=\"failure\"}[5m]) > 5",
+          "titleFormat": "Login Failures",
+          "textFormat": "High rate of failed login attempts"
+        }
+      ]
+    }
+  }
+}

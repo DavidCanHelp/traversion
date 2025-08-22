@@ -1,0 +1,272 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traversion-app
+  namespace: traversion-system
+  labels:
+    app.kubernetes.io/name: traversion
+    app.kubernetes.io/component: api
+    app.kubernetes.io/version: "0.1.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traversion
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: traversion
+        app.kubernetes.io/component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      serviceAccountName: traversion-service-account
+      containers:
+      - name: traversion
+        image: traversion:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3333
+          name: http
+          protocol: TCP
+        - containerPort: 3334
+          name: websocket
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: traversion-config
+              key: PORT
+        - name: WS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: traversion-config
+              key: WS_PORT
+        - name: METRICS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: traversion-config
+              key: METRICS_PORT
+        - name: DB_URL
+          valueFrom:
+            secretKeyRef:
+              name: traversion-secrets
+              key: DB_URL
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: traversion-secrets
+              key: REDIS_URL
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: traversion-secrets
+              key: JWT_SECRET
+        - name: SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: traversion-secrets
+              key: SESSION_SECRET
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: traversion-secrets
+              key: ENCRYPTION_KEY
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: traversion-secrets
+              key: AWS_ACCESS_KEY_ID
+              optional: true
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: traversion-secrets
+              key: AWS_SECRET_ACCESS_KEY
+              optional: true
+        - name: AWS_REGION
+          valueFrom:
+            secretKeyRef:
+              name: traversion-secrets
+              key: AWS_REGION
+              optional: true
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          valueFrom:
+            secretKeyRef:
+              name: traversion-secrets
+              key: GOOGLE_APPLICATION_CREDENTIALS
+              optional: true
+        envFrom:
+        - configMapRef:
+            name: traversion-config
+        volumeMounts:
+        - name: backup-storage
+          mountPath: /app/backups
+        - name: temp-storage
+          mountPath: /tmp
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3333
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3333
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 3333
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 12
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+      volumes:
+      - name: backup-storage
+        persistentVolumeClaim:
+          claimName: traversion-backups
+      - name: temp-storage
+        emptyDir: {}
+      initContainers:
+      - name: wait-for-db
+        image: postgres:15-alpine
+        command:
+        - sh
+        - -c
+        - |
+          until pg_isready -h timescaledb-service -p 5432 -U traversion; do
+            echo "Waiting for database..."
+            sleep 2
+          done
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: timescaledb-secrets
+              key: POSTGRES_PASSWORD
+      - name: wait-for-redis
+        image: redis:7.2-alpine
+        command:
+        - sh
+        - -c
+        - |
+          until redis-cli -h redis-service -p 6379 -a $REDIS_PASSWORD ping; do
+            echo "Waiting for Redis..."
+            sleep 2
+          done
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secrets
+              key: REDIS_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traversion-service
+  namespace: traversion-system
+  labels:
+    app.kubernetes.io/name: traversion
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3333
+    targetPort: 3333
+    protocol: TCP
+    name: http
+  - port: 3334
+    targetPort: 3334
+    protocol: TCP
+    name: websocket
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app.kubernetes.io/name: traversion
+    app.kubernetes.io/component: api
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traversion-service-account
+  namespace: traversion-system
+  labels:
+    app.kubernetes.io/name: traversion
+    app.kubernetes.io/component: service-account
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: traversion-cluster-role
+  labels:
+    app.kubernetes.io/name: traversion
+    app.kubernetes.io/component: rbac
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: traversion-cluster-role-binding
+  labels:
+    app.kubernetes.io/name: traversion
+    app.kubernetes.io/component: rbac
+subjects:
+- kind: ServiceAccount
+  name: traversion-service-account
+  namespace: traversion-system
+roleRef:
+  kind: ClusterRole
+  name: traversion-cluster-role
+  apiGroup: rbac.authorization.k8s.io

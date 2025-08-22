@@ -1,285 +1,330 @@
-# Traversion: Production Time Machine for Debugging
+# 🕵️ Traversion
 
-> From local code versioning to production debugging platform - traverse through time to fix any issue
+**Post-incident forensics and impact analysis for development teams**
 
-## 🎯 The Evolution
+Stop guessing what caused your production incidents. Traversion analyzes your Git history to identify suspicious commits, assess pull request risks, and provide actionable insights for faster incident resolution.
 
-**Started as:** A time machine for "vibe coders" - automatic code versioning with zero friction
+## 🎯 What Problem Does It Solve?
 
-**Became:** A complete production debugging platform that lets you rewind production to any point in time
+When production breaks, you need answers fast:
+- **Which recent changes could have caused this?**
+- **What was risky about that deployment?** 
+- **Who should we involve in the investigation?**
+- **What patterns led to this incident?**
 
-Traversion now offers two powerful modes:
-1. **Local Development** - Automatic code versioning, timeline navigation, vibe search
-2. **Production Debugging** - Time travel through production, root cause analysis, predictive analytics
+Traditional Git tools show *what* changed, but not *why* it might be problematic. Traversion analyzes commits using risk factors to highlight the most likely culprits.
 
-## 🚀 Quick Start
+## ⚡ Quick Start
 
-### Local Development Mode
 ```bash
-# Install dependencies
+# Install globally
+npm install -g traversion
+
+# Analyze an incident from 2 hours ago
+trav incident --time "2 hours ago" --hours 24
+
+# Analyze a risky PR before merging  
+trav pr microsoft/vscode/1234 --comment
+
+# Start web interface for team use
+npm start
+```
+
+## 🔍 Core Features
+
+### 1. **Incident Forensics**
+Quickly identify suspicious commits around incident time:
+
+```bash
+trav incident --time "2023-12-01T15:30:00Z" --hours 48 --files "server.js,database.js"
+```
+
+**Risk Scoring Based On:**
+- Off-hours deployments (weekends, nights)
+- Configuration and infrastructure changes  
+- Large or widespread code changes
+- Vague commit messages ("fix", "update")
+- Changes to affected files
+- Database migrations and schema changes
+
+### 2. **Pull Request Impact Analysis**
+Assess risk before merging:
+
+```bash
+trav pr owner/repo/123 --comment
+```
+
+**Analyzes:**
+- File change patterns and risk areas
+- Deployment complexity and testing needs  
+- Scope and potential blast radius
+- Automated risk scoring and recommendations
+
+### 3. **Interactive Web Interface**
+Perfect for team incident response:
+
+```bash
+npm start  # Visit http://localhost:3335
+```
+
+- Visual incident timeline analysis
+- PR risk assessment dashboard
+- Team-friendly reports and recommendations
+- No technical Git knowledge required
+
+## 📊 Example Output
+
+### Incident Analysis:
+```
+🚨 INCIDENT FORENSICS REPORT
+═══════════════════════════════════════════════════════════
+🕐 Incident Time: 2023-12-01T15:30:00Z
+📅 Analysis Window: 24 hours  
+🔍 Suspicious Commits: 3
+
+🎯 TOP SUSPECTS:
+1. 🚨 a1b2c3d4 hotfix: update database connection timeout
+   👤 john.doe | ⏰ 12/01/2023, 2:15:00 PM
+   📊 Risk: 85% | Files: 2 | +15/-3
+   🏷️ Off-hours deployment, Configuration changes, Urgent/fix commit
+
+2. ⚠️ e5f6g7h8 refactor user authentication module  
+   👤 jane.smith | ⏰ 12/01/2023, 11:30:00 AM
+   📊 Risk: 65% | Files: 8 | +234/-156
+   🏷️ Security changes, Large code changes
+
+💡 RECOMMENDATIONS:
+🔴 INVESTIGATION: Start with commit a1b2c3d4 - highest risk score
+🔴 ROLLBACK: Consider rolling back 1 high-risk commit if safe
+🟡 CONFIG: Configuration changes detected - verify environment variables
+```
+
+### PR Analysis:
+```
+📋 PULL REQUEST ANALYSIS  
+═══════════════════════════════════════════════════════════
+🚨 PR #1234: Implement user session management
+👤 Author: contributor
+📊 Risk Score: 72%
+📈 Changes: +445 -123 (12 files)
+
+📊 IMPACT ASSESSMENT:
+   Scope: Medium - affects multiple components
+   Complexity: Medium-High - security changes
+   Risk Areas: Security, Configuration, Database
+
+🧪 TESTING RECOMMENDATIONS:
+   • Security regression testing
+   • Authentication/authorization testing  
+   • Full regression testing
+   • Performance testing
+
+💡 RECOMMENDATIONS:
+🔴 REVIEW: High-risk PR - require multiple senior reviewers
+🔴 SECURITY: Require security team review for auth changes
+🟡 PROCESS: Add detailed description explaining security implications
+```
+
+## 🛠️ Installation & Setup
+
+### Prerequisites
+- Node.js 18+
+- Git repository
+- GitHub token (optional, for PR analysis)
+
+### Install
+```bash
+npm install -g traversion
+
+# Or run locally  
+git clone https://github.com/your-org/traversion
+cd traversion
 npm install
-
-# Start Traversion for code versioning
-npm run dev
-
-# Open UI at http://localhost:3333
 ```
 
-### Production Debugging Mode
+### Configuration
 ```bash
-# Run the production demo with dashboard
-npm run demo:production
-# Dashboard opens automatically at http://localhost:3335/dashboard
+# Set GitHub token for PR analysis (optional)
+export GITHUB_TOKEN=your_github_token
 
-# Or run the causality engine demo
-npm run test:causality
+# Configure custom risk patterns (optional)
+export TRAVERSION_CONFIG=/path/to/config.json
 ```
 
-## 💡 The Hook
+## 📋 CLI Commands
 
-**"Your app crashed at 3:47 AM? Let's go to 3:46 AM and watch it happen."**
+| Command | Description | Example |
+|---------|-------------|---------|
+| `trav incident` | Analyze incident timeline | `trav incident --time "2 hours ago"` |
+| `trav pr` | Analyze pull request | `trav pr owner/repo/123 --comment` |
+| `trav analyze` | Analyze specific commits | `trav analyze --commits "abc123,def456"` |
+| `trav forensics` | Interactive incident mode | `trav forensics` |
 
-## 💡 What Traversion Does
+### Incident Analysis Options
+```bash
+trav incident [options]
+  -t, --time <time>     Incident time (ISO string or "X hours ago")
+  -h, --hours <hours>   Hours to look back (default: 24)  
+  -f, --files <files>   Comma-separated affected files
+```
 
-### In Development
-Traversion automatically captures every save, tags your code with vibes, and lets you travel through your coding journey.
+### PR Analysis Options  
+```bash
+trav pr <owner>/<repo>/<number> [options]
+  --comment             Post analysis as PR comment
+```
 
-### In Production
-Traversion records EVERYTHING in your production environment:
-- Every API request and response
-- Every database change
-- Every deployment and rollback
-- Every configuration update
-- Every log line and metric
-- Every state mutation
-- Every service interaction
+## 🎯 Use Cases
 
-Then uses AI to understand causality chains - not just "what changed" but "what caused what" - giving you superhuman debugging abilities.
+### 1. **Post-Incident Analysis**
+When production breaks, immediately run:
+```bash  
+trav incident --time "30 minutes ago" --hours 24
+```
+Get a ranked list of suspicious commits to investigate first.
 
-## ⚡ Key Features
+### 2. **Pre-Deployment Risk Assessment**  
+Before merging high-risk PRs:
+```bash
+trav pr your-org/your-repo/456 --comment  
+```
+Automatically comment with risk assessment and testing recommendations.
 
-### Development Features
-- **Automatic Version Capture** - Every save is a version
-- **Vibe Search** - Find code by feel: "when it was fast"
-- **Smart Tagging** - 100+ patterns detected automatically
-- **VS Code Extension** - Time travel in your editor
-- **CLI Tool** - Remote access from anywhere
+### 3. **Code Review Enhancement**
+Add Traversion analysis to your PR template or CI pipeline to surface risks that human reviewers might miss.
 
-### Production Features
+### 4. **Incident Response Training**
+Use historical incidents to train teams on pattern recognition and investigation techniques.
 
-### Time Travel Slider
-- Drag to rewind/fast-forward through production time
-- Pause at any moment to explore system state
-- Zoom in to millisecond precision
-- Jump to specific events or timestamps
+## ⚙️ How It Works
 
-### Omniscient Debugging
-- See the complete system state at any moment
-- Trace requests across all services
-- Understand data flow and mutations
-- Identify causality chains automatically
+### Risk Scoring Algorithm
+Commits are scored (0-1.0) based on:
 
-### What-If Analysis
-- Test fixes against historical states
-- Simulate different code paths
-- Validate patches before deployment
-- Predict impact of changes
+**Timing Factors (0.2)**
+- Weekend/off-hours deployments
+- Holiday deployments  
 
-### AI-Powered Insights
-- Automatic root cause analysis
-- Pattern recognition across incidents
-- Predictive failure detection
-- Smart alerting based on historical patterns
+**Change Factors (0.4)**  
+- Configuration files (`config`, `env`, `.yml`)
+- Database changes (`migration`, `schema`, `.sql`)
+- Infrastructure (`Dockerfile`, `k8s/`, `deploy/`)
+- Security code (`auth`, `login`, `security`)
+- Large changesets (>500 lines)
 
-## 🎬 The Demo That Sells
+**Context Factors (0.4)**
+- Urgent keywords (`hotfix`, `critical`, `emergency`)
+- Vague commit messages  
+- Changes to incident-affected files
+- Multiple files modified
 
-1. **Opening:** Show a production error happening right now
-2. **Time Travel:** Drag the slider back 5 minutes before the error
-3. **Play Forward:** Watch in slow motion as the error approaches
-4. **Pinpoint:** Pause at the exact moment of failure
-5. **Explore:** Click into any service, see exact state, trace the bad request
-6. **Root Cause:** AI highlights the commit that introduced the bug
-7. **Test Fix:** Apply a patch and test it against that historical state
-8. **Mind Blown:** "This would have taken us 6 hours to debug. It took 30 seconds."
+### PR Risk Assessment
+Evaluates:
+- **File change patterns** - What types of files were modified
+- **Scope analysis** - How many components are affected  
+- **Complexity assessment** - Database, security, infrastructure changes
+- **Testing requirements** - What types of testing are needed
+- **Deployment risks** - Potential issues during rollout
 
-## 💰 Why This Wins
+## 🚀 Integration
 
-### For Developers
-- **Fantasy fulfilled:** Every developer has wished for production time travel
-- **Massive time savings:** Hours of debugging reduced to minutes
-- **Confidence boost:** Test fixes against real production states
-- **Learning tool:** See how senior engineers debug by watching their sessions
+### GitHub Actions
+```yaml
+- name: Analyze PR Risk
+  run: |
+    npx traversion pr ${{ github.repository }}/${{ github.event.number }} --comment
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
 
-### For Business
-- **Reduce MTTR:** Mean Time To Resolution drops by 10x
-- **Prevent repeat incidents:** AI learns from every debugging session
-- **Reduce on-call stress:** Junior engineers can debug like seniors
-- **Compliance/Audit:** Complete record of system state for investigations
+### Slack/Discord Webhooks
+```bash  
+trav incident --time "1 hour ago" --json | curl -X POST -H 'Content-type: application/json' --data @- YOUR_WEBHOOK_URL
+```
 
-### For the Market
-- **Clear value prop:** "Time travel for debugging" - instantly understood
-- **Viral demos:** The slider UI is incredibly shareable/memorable
-- **Enterprise ready:** Solves million-dollar downtime problems
-- **Platform potential:** Becomes the system of record for production state
+### Monitoring Integration
+```javascript
+// When incident detected
+const analysis = await traversion.analyzeIncident(new Date(), 24, affectedFiles);
+await alertManager.send(`Top suspect: ${analysis.suspiciousCommits[0].shortHash}`);
+```
 
-## 🏗️ How It Works
+## 🎛️ Configuration
 
-### Data Collection Layer
-- Lightweight agents on every service
-- eBPF for system-level monitoring
-- Database change data capture (CDC)
-- API gateway integration
-- Distributed tracing expansion
+### Custom Risk Patterns
+Create `traversion.config.js`:
+```javascript
+export default {
+  riskPatterns: {
+    'Payment System': /payment|billing|stripe|paypal/i,
+    'User Data': /user|profile|account|personal/i,
+    'Critical API': /api\/(auth|payment|user)/i
+  },
+  riskWeights: {
+    offHours: 0.3,
+    largeChanges: 0.4,  
+    configChanges: 0.5
+  },
+  excludeFiles: ['*.test.js', '*.spec.js', 'docs/']
+};
+```
 
-### Storage Architecture
-- Columnar storage for time-series data
-- Intelligent compression and sampling
-- Hot/warm/cold data tiers
-- Privacy-preserving options (PII masking)
+### Team Notification Rules
+```javascript
+export default {
+  notifications: {
+    highRisk: ['security-team@company.com'],
+    database: ['dba-team@company.com'],
+    infrastructure: ['devops-team@company.com']
+  }
+};
+```
 
-### Query Engine
-- Time-based indexing
-- Distributed query execution
-- Real-time and historical modes
-- Sub-second response times
+## 🔮 Advanced Features
 
-### AI/ML Pipeline
-- Causal inference models
-- Anomaly detection
-- Pattern matching
-- Predictive analytics
+### Machine Learning Enhancement (Coming Soon)
+- Historical incident pattern learning
+- Team-specific risk factor weighting  
+- Anomaly detection for unusual patterns
 
-## 🎯 Target Customers
+### Integration Ecosystem (Coming Soon)
+- Jira incident linking
+- PagerDuty integration
+- DataDog/NewRelic correlation
+- Slack incident bot
 
-### Primary: Scale-ups ($10-100M ARR)
-- Complex enough to need this
-- Budget for tools
-- Moving fast, breaking things
-- 50-500 engineers
+## 🤝 Contributing
 
-### Secondary: Enterprise Tech Companies
-- Multiple production environments
-- Compliance requirements
-- Large engineering teams
-- High cost of downtime
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-### Tertiary: Cutting-edge Startups
-- Early adopters
-- Developer influencers
-- Case study potential
+### Development Setup
+```bash
+git clone https://github.com/your-org/traversion
+cd traversion  
+npm install
+npm test
+npm run dev
+```
 
-## 💵 Pricing Model
+### Architecture
+- `src/forensics/` - Core analysis algorithms
+- `src/integrations/` - GitHub, Slack, etc. integrations
+- `src/cli/` - Command-line interface
+- `src/web/` - Web interface for teams
 
-### Starter - $500/month
-- 7 days retention
-- 5 services
-- 10 users
-- Basic time travel
+## 📝 License
 
-### Team - $2,500/month
-- 30 days retention
-- 25 services
-- 50 users
-- AI insights
-- What-if analysis
+MIT License - see [LICENSE](LICENSE) for details.
 
-### Enterprise - $10,000+/month
-- 90+ days retention
-- Unlimited services
-- Unlimited users
-- Advanced AI
-- Custom integrations
-- SLA support
+## 🆘 Support
 
-## 🚦 Go-to-Market Strategy
-
-### Phase 1: Build Credibility
-- Open source the collection agents
-- Blog about time-travel debugging
-- Conference talks on the concept
-- Early access to influencers
-
-### Phase 2: Land and Expand
-- Free tier for small teams
-- Viral demo videos
-- Integration with popular tools
-- Developer community building
-
-### Phase 3: Enterprise Push
-- SOC2 compliance
-- Enterprise features (RBAC, SSO)
-- Professional services
-- Industry-specific solutions
-
-## 🎨 The Experience
-
-### First Use (The "Aha!" Moment)
-1. Install agent with one command
-2. Wait 5 minutes for data collection
-3. Open Traversion dashboard
-4. See your live system visualized
-5. Drag the slider back in time
-6. Mind = Blown
-
-### Daily Use
-- Check Traversion before investigating any issue
-- Use for code reviews ("what will this change affect?")
-- Training new team members
-- Post-mortem analysis
-
-### Advanced Use
-- Capacity planning using historical patterns
-- Chaos engineering validation
-- Security incident investigation
-- Performance optimization
-
-## 🚀 Competitive Advantages
-
-1. **Unique Positioning:** Nobody else offers "time travel debugging"
-2. **Network Effects:** More data = better AI insights
-3. **High Switching Costs:** Becomes core to debugging workflow
-4. **Data Moat:** Historical data becomes invaluable
-5. **Platform Potential:** Can expand to testing, monitoring, security
-
-## 📈 Success Metrics
-
-### Product Metrics
-- Time to first insight: <2 minutes
-- MTTR reduction: >50%
-- Daily active usage: >80% of incidents
-- Data compression ratio: 100:1
-
-### Business Metrics
-- $1M ARR in 6 months
-- 100 paying customers in year 1
-- 150% net revenue retention
-- <$1000 CAC
-
-## 🔮 Future Vision
-
-### Year 1: Time Machine
-- Perfect the core time travel experience
-- Build essential integrations
-- Establish product-market fit
-
-### Year 2: Predictive Platform
-- Predict failures before they happen
-- Automated remediation suggestions
-- Cross-customer pattern learning
-
-### Year 3: Autonomous Operations
-- Self-healing systems
-- Automatic rollback on detection
-- AI pair programmer for debugging
-
-## 🏁 Next Steps
-
-1. Build proof of concept with 3 customers
-2. Validate 10x MTTR improvement claim
-3. Raise seed round
-4. Hire founding engineering team
-5. Launch public beta
+- 📖 [Documentation](https://traversion.dev/docs)  
+- 💬 [GitHub Discussions](https://github.com/your-org/traversion/discussions)
+- 🐛 [Report Issues](https://github.com/your-org/traversion/issues)
+- 📧 Support: support@traversion.dev
 
 ---
 
-*Traversion: Because production debugging shouldn't feel like archaeology.*
+**Stop playing detective with your incidents. Let Traversion do the investigating.**
+
+🔍 *Made with ❤️ for development teams who deserve better incident response.*

@@ -1,0 +1,212 @@
+version: '3.8'
+
+services:
+  # TimescaleDB for time-series event storage
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: traversion-timescale
+    environment:
+      POSTGRES_DB: traversion
+      POSTGRES_USER: traversion
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-traversion_secret}
+      TS_TUNE_MAX_CONNS: 100
+      TS_TUNE_MAX_BG_WORKERS: 8
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traversion"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - traversion-network
+
+  # Redis for caching and real-time data
+  redis:
+    image: redis:7-alpine
+    container_name: traversion-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - traversion-network
+
+  # Local file watcher service
+  file-watcher:
+    build:
+      context: .
+      dockerfile: Dockerfile.watcher
+    container_name: traversion-watcher
+    environment:
+      NODE_ENV: production
+      DB_HOST: timescaledb
+      DB_PORT: 5432
+      DB_NAME: traversion
+      DB_USER: traversion
+      DB_PASSWORD: ${DB_PASSWORD:-traversion_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+    ports:
+      - "3333:3333"
+      - "3334:3334"
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - watcher_data:/app/.traversion
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - traversion-network
+
+  # Production event collector service
+  event-collector:
+    build:
+      context: .
+      dockerfile: Dockerfile.collector
+    container_name: traversion-collector
+    environment:
+      NODE_ENV: production
+      DB_HOST: timescaledb
+      DB_PORT: 5432
+      DB_NAME: traversion
+      DB_USER: traversion
+      DB_PASSWORD: ${DB_PASSWORD:-traversion_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      COLLECTOR_PORT: 3337
+    ports:
+      - "3337:3337"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - traversion-network
+
+  # Causality engine service
+  causality-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.causality
+    container_name: traversion-causality
+    environment:
+      NODE_ENV: production
+      DB_HOST: timescaledb
+      DB_PORT: 5432
+      DB_NAME: traversion
+      DB_USER: traversion
+      DB_PASSWORD: ${DB_PASSWORD:-traversion_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - traversion-network
+
+  # Query API service
+  query-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: traversion-api
+    environment:
+      NODE_ENV: production
+      DB_HOST: timescaledb
+      DB_PORT: 5432
+      DB_NAME: traversion
+      DB_USER: traversion
+      DB_PASSWORD: ${DB_PASSWORD:-traversion_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      API_PORT: 3338
+    ports:
+      - "3338:3338"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      causality-engine:
+        condition: service_started
+    networks:
+      - traversion-network
+
+  # Production dashboard
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: traversion-dashboard
+    environment:
+      API_URL: http://query-api:3338
+      WS_URL: ws://event-collector:3337
+    ports:
+      - "3335:80"
+    depends_on:
+      - query-api
+      - event-collector
+    networks:
+      - traversion-network
+
+  # Grafana for monitoring
+  grafana:
+    image: grafana/grafana:latest
+    container_name: traversion-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - traversion-network
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: traversion-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - traversion-network
+
+networks:
+  traversion-network:
+    driver: bridge
+
+volumes:
+  timescale_data:
+  redis_data:
+  watcher_data:
+  grafana_data:
+  prometheus_data:

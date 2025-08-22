@@ -1,0 +1,286 @@
+# Traversion Prometheus Alerting Rules
+# Production-ready alerts for monitoring critical system health
+
+groups:
+  - name: traversion.critical
+    rules:
+      - alert: TraversionAPIDown
+        expr: up{job="traversion-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: traversion-api
+        annotations:
+          summary: "Traversion API is down"
+          description: "Traversion API has been down for more than 1 minute"
+          runbook_url: "https://docs.traversion.com/runbooks/api-down"
+      
+      - alert: TraversionDatabaseDown
+        expr: up{job="traversion-postgres"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Traversion database is down"
+          description: "TimescaleDB database has been unreachable for more than 30 seconds"
+          runbook_url: "https://docs.traversion.com/runbooks/database-down"
+      
+      - alert: TraversionHighErrorRate
+        expr: |
+          (
+            rate(traversion_http_requests_total{status_code=~"5.."}[5m]) /
+            rate(traversion_http_requests_total[5m])
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: traversion-api
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+          runbook_url: "https://docs.traversion.com/runbooks/high-error-rate"
+      
+      - alert: TraversionHighResponseTime
+        expr: |
+          histogram_quantile(0.95, 
+            rate(traversion_http_request_duration_seconds_bucket[5m])
+          ) > 2
+        for: 3m
+        labels:
+          severity: critical
+          service: traversion-api
+        annotations:
+          summary: "High API response times"
+          description: "95th percentile response time is {{ $value }}s"
+          runbook_url: "https://docs.traversion.com/runbooks/high-latency"
+
+  - name: traversion.security
+    rules:
+      - alert: TraversionAuthenticationFailureSpike
+        expr: |
+          rate(traversion_auth_attempts_total{result="failure"}[5m]) > 10
+        for: 1m
+        labels:
+          severity: critical
+          service: authentication
+          category: security
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is {{ $value }}/sec for tenant {{ $labels.tenant_id }}"
+          runbook_url: "https://docs.traversion.com/runbooks/auth-failures"
+      
+      - alert: TraversionSuspiciousIPActivity
+        expr: |
+          sum by (ip_address) (
+            rate(traversion_auth_attempts_total{result="failure"}[5m])
+          ) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: authentication
+          category: security
+        annotations:
+          summary: "Suspicious IP activity detected"
+          description: "IP {{ $labels.ip_address }} has {{ $value }} failed attempts/sec"
+          runbook_url: "https://docs.traversion.com/runbooks/suspicious-ip"
+      
+      - alert: TraversionPermissionViolations
+        expr: |
+          increase(traversion_permission_violations_total[10m]) > 20
+        for: 1m
+        labels:
+          severity: warning
+          service: authorization
+          category: security
+        annotations:
+          summary: "Multiple permission violations"
+          description: "{{ $value }} permission violations in the last 10 minutes"
+          runbook_url: "https://docs.traversion.com/runbooks/permission-violations"
+
+  - name: traversion.performance
+    rules:
+      - alert: TraversionHighMemoryUsage
+        expr: traversion_memory_usage_bytes{type="heapUsed"} / traversion_memory_usage_bytes{type="heapTotal"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          service: traversion-api
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.traversion.com/runbooks/high-memory"
+      
+      - alert: TraversionHighCPUUsage
+        expr: traversion_cpu_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: traversion-api
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%"
+          runbook_url: "https://docs.traversion.com/runbooks/high-cpu"
+      
+      - alert: TraversionSlowCausalityDetection
+        expr: |
+          histogram_quantile(0.95, 
+            rate(traversion_causality_detection_duration_seconds_bucket[5m])
+          ) > 1
+        for: 3m
+        labels:
+          severity: warning
+          service: causality-engine
+        annotations:
+          summary: "Slow causality detection"
+          description: "95th percentile causality detection time is {{ $value }}s"
+          runbook_url: "https://docs.traversion.com/runbooks/slow-causality"
+      
+      - alert: TraversionSlowQueries
+        expr: |
+          histogram_quantile(0.95, 
+            rate(traversion_query_duration_seconds_bucket[5m])
+          ) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: query-engine
+        annotations:
+          summary: "Slow TimeQL queries"
+          description: "95th percentile query time is {{ $value }}s for {{ $labels.query_type }}"
+          runbook_url: "https://docs.traversion.com/runbooks/slow-queries"
+
+  - name: traversion.storage
+    rules:
+      - alert: TraversionDatabaseConnectionsHigh
+        expr: traversion_storage_connections_active > 80
+        for: 3m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High database connection usage"
+          description: "{{ $value }} active database connections"
+          runbook_url: "https://docs.traversion.com/runbooks/high-db-connections"
+      
+      - alert: TraversionDatabaseSizeGrowth
+        expr: |
+          increase(traversion_storage_size_bytes[1h]) > 1e9  # 1GB growth per hour
+        for: 1m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Rapid database growth"
+          description: "Database grew by {{ $value | humanizeBytes }} in the last hour"
+          runbook_url: "https://docs.traversion.com/runbooks/database-growth"
+      
+      - alert: TraversionEventIngestionLag
+        expr: |
+          (
+            time() - 
+            traversion_last_event_timestamp
+          ) > 300  # 5 minutes
+        for: 2m
+        labels:
+          severity: warning
+          service: event-ingestion
+        annotations:
+          summary: "Event ingestion lag detected"
+          description: "No events received for {{ $value }}s"
+          runbook_url: "https://docs.traversion.com/runbooks/ingestion-lag"
+
+  - name: traversion.business
+    rules:
+      - alert: TraversionLowCausalityDetectionRate
+        expr: rate(traversion_causality_detections_total[10m]) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: causality-engine
+        annotations:
+          summary: "Low causality detection rate"
+          description: "Causality detection rate is {{ $value }}/sec"
+          runbook_url: "https://docs.traversion.com/runbooks/low-causality-rate"
+      
+      - alert: TraversionAnomalyScoreAnomaly
+        expr: |
+          avg_over_time(traversion_event_anomaly_score[10m]) < 0.1 or
+          avg_over_time(traversion_event_anomaly_score[10m]) > 0.8
+        for: 5m
+        labels:
+          severity: info
+          service: causality-engine
+        annotations:
+          summary: "Unusual anomaly score pattern"
+          description: "Average anomaly score is {{ $value }} over 10 minutes"
+          runbook_url: "https://docs.traversion.com/runbooks/anomaly-scores"
+      
+      - alert: TraversionWebSocketConnectionsHigh
+        expr: sum(traversion_websocket_connections) > 1000
+        for: 2m
+        labels:
+          severity: warning
+          service: websocket
+        annotations:
+          summary: "High WebSocket connection count"
+          description: "{{ $value }} active WebSocket connections"
+          runbook_url: "https://docs.traversion.com/runbooks/high-websocket-connections"
+
+  - name: traversion.multi-tenant
+    rules:
+      - alert: TraversionTenantDataLeak
+        expr: |
+          sum by (tenant_id) (
+            rate(traversion_cross_tenant_access_attempts_total[5m])
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: multi-tenancy
+          category: security
+        annotations:
+          summary: "Potential tenant data leak"
+          description: "Cross-tenant access attempts detected for tenant {{ $labels.tenant_id }}"
+          runbook_url: "https://docs.traversion.com/runbooks/tenant-isolation"
+      
+      - alert: TraversionTenantQuotaExceeded
+        expr: |
+          traversion_tenant_storage_usage_bytes / 
+          traversion_tenant_storage_quota_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: multi-tenancy
+        annotations:
+          summary: "Tenant approaching storage quota"
+          description: "Tenant {{ $labels.tenant_id }} is at {{ $value | humanizePercentage }} of quota"
+          runbook_url: "https://docs.traversion.com/runbooks/tenant-quota"
+
+  - name: traversion.infrastructure
+    rules:
+      - alert: TraversionRedisDown
+        expr: up{job="traversion-redis"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis has been down for more than 1 minute"
+          runbook_url: "https://docs.traversion.com/runbooks/redis-down"
+      
+      - alert: TraversionDiskSpaceHigh
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/"} /
+            node_filesystem_size_bytes{mountpoint="/"}
+          ) < 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "Low disk space"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+          runbook_url: "https://docs.traversion.com/runbooks/disk-space"

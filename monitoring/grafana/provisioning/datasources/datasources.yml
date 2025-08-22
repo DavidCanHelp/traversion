@@ -1,0 +1,38 @@
+# Grafana Datasource Configuration for Traversion
+apiVersion: 1
+
+datasources:
+  # Prometheus datasource
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      queryTimeout: 60s
+    
+  # TimescaleDB datasource for direct queries
+  - name: TimescaleDB
+    type: postgres
+    access: proxy
+    url: timescaledb:5432
+    database: traversion
+    user: traversion
+    secureJsonData:
+      password: traversion_secret
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 10
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+    
+  # JSON API datasource for Traversion API
+  - name: Traversion API
+    type: simplejson
+    access: proxy
+    url: http://query-api:3338/api
+    jsonData:
+      httpHeaderName1: 'Content-Type'
+    secureJsonData:
+      httpHeaderValue1: 'application/json'

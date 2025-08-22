@@ -1,0 +1,19 @@
+# Grafana Dashboard Provisioning for Traversion
+apiVersion: 1
+
+providers:
+  # Dashboard provider for Traversion dashboards
+  - name: 'traversion-dashboards'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    options:
+      path: /var/lib/grafana/dashboards
+
+  # Dashboard provider for system metrics
+  - name: 'system-dashboards'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    options:
+      path: /var/lib/grafana/dashboards/system

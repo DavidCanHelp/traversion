@@ -1,8 +1,9 @@
 import { performance } from 'perf_hooks';
 import v8 from 'v8';
 import os from 'os';
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
 import logger from './logger.js';
+import { InputSanitizer } from '../security/inputSanitizer.js';
 
 export class PerformanceProfiler {
   constructor() {
@@ -230,12 +231,14 @@ export class PerformanceProfiler {
     };
   }
   
-  getSystemMetrics() {
+  async getSystemMetrics() {
+    const cpuUsage = await this.getCpuUsage();
+    
     return {
       cpu: {
         loadAvg: os.loadavg(),
         cores: os.cpus().length,
-        usage: this.getCpuUsage()
+        usage: cpuUsage
       },
       memory: {
         total: os.totalmem(),
@@ -251,21 +254,63 @@ export class PerformanceProfiler {
     };
   }
   
-  getCpuUsage() {
-    // Get CPU usage for current process
+  async getCpuUsage() {
+    // Get CPU usage for current process using secure spawn
     try {
       const pid = process.pid;
-      if (process.platform === 'darwin') {
-        const usage = execSync(`ps -p ${pid} -o %cpu=`).toString().trim();
-        return parseFloat(usage);
-      } else if (process.platform === 'linux') {
-        const usage = execSync(`ps -p ${pid} -o %cpu --no-headers`).toString().trim();
-        return parseFloat(usage);
+      let args;
+      
+      // Validate PID is a safe integer
+      if (!Number.isInteger(pid) || pid <= 0) {
+        logger.debug('Invalid PID', { pid });
+        return 0;
       }
+      
+      const sanitizedPid = InputSanitizer.sanitizeInteger(pid, 1, 999999).toString();
+      
+      if (process.platform === 'darwin') {
+        args = ['-p', sanitizedPid, '-o', '%cpu='];
+      } else if (process.platform === 'linux') {
+        args = ['-p', sanitizedPid, '-o', '%cpu', '--no-headers'];
+      } else {
+        return 0;
+      }
+      
+      return new Promise((resolve) => {
+        const psProcess = spawn('ps', args, {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 5000
+        });
+        
+        let stdout = '';
+        
+        psProcess.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        psProcess.on('close', (code) => {
+          if (code === 0) {
+            const usage = parseFloat(stdout.trim());
+            resolve(isNaN(usage) ? 0 : usage);
+          } else {
+            resolve(0);
+          }
+        });
+        
+        psProcess.on('error', (error) => {
+          logger.debug('Could not get CPU usage', { error: error.message });
+          resolve(0);
+        });
+        
+        psProcess.on('timeout', () => {
+          psProcess.kill('SIGKILL');
+          resolve(0);
+        });
+      });
     } catch (error) {
       logger.debug('Could not get CPU usage', { error: error.message });
+      return 0;
     }
-    return 0;
   }
   
   profileFunction(fn, label = 'function') {
@@ -328,10 +373,10 @@ export class PerformanceProfiler {
     return { result, profile };
   }
   
-  generateReport(versionId) {
+  async generateReport(versionId) {
     const metrics = this.getVersionMetrics(versionId);
     const regression = this.detectPerformanceRegression(versionId);
-    const system = this.getSystemMetrics();
+    const system = await this.getSystemMetrics();
     
     return {
       version: versionId,

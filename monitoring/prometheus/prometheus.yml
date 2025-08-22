@@ -1,0 +1,72 @@
+# Traversion Prometheus Configuration
+# Scrapes metrics from all Traversion services
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # Uncomment if you want to add Alertmanager
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+  - "alerts.yml"
+
+# Scrape configuration
+scrape_configs:
+  # Traversion API server
+  - job_name: 'traversion-api'
+    static_configs:
+      - targets: ['query-api:3338']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Traversion Event Collector
+  - job_name: 'traversion-collector'
+    static_configs:
+      - targets: ['event-collector:3337']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # Traversion File Watcher
+  - job_name: 'traversion-watcher'
+    static_configs:
+      - targets: ['file-watcher:3333']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # TimescaleDB using postgres_exporter
+  - job_name: 'traversion-postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+
+  # Redis using redis_exporter
+  - job_name: 'traversion-redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+
+  # Node exporter for system metrics (if available)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Grafana
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 60s
