@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traversion - Time Machine for Vibe Coders</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="app-header">
+      <h1 class="logo">
+        <span class="logo-text">TRAVERSION</span>
+        <span class="logo-subtitle">Time Machine for Vibe Coders</span>
+      </h1>
+      <div class="header-actions">
+        <vibe-search></vibe-search>
+        <button id="compare-mode-btn" class="btn btn-secondary">
+          Compare Mode
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="app-layout">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <recent-activity></recent-activity>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <code-viewer></code-viewer>
+      </main>
+    </div>
+
+    <!-- Timeline -->
+    <time-slider></time-slider>
+
+    <!-- Status Bar -->
+    <status-bar></status-bar>
+  </div>
+
+  <!-- Load Prism for syntax highlighting -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+  
+  <!-- Load diff library -->
+  <script src="https://cdn.jsdelivr.net/npm/diff@5.1.0/dist/diff.min.js"></script>
+  
+  <!-- Load our components -->
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

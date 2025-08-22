@@ -1,0 +1,6 @@
+/* Demo CSS for Traversion */
+body {
+  background: linear-gradient(45deg, #00ffcc, #ff00ff);
+  color: white;
+  font-family: 'JetBrains Mono', monospace;
+}
