@@ -10,6 +10,9 @@
   "scripts": {
     "dev": "node -e \"import('./src/security/secureWebInterface.js').then(m => new m.SecureWebInterface(3335).start())\"",
     "start": "node -e \"import('./src/security/secureWebInterface.js').then(m => new m.SecureWebInterface(3335).start())\"",
+    "enterprise": "node enterprise-start.js",
+    "platform": "node enterprise-start.js",
+    "dashboard": "node -e \"import('./src/dashboard/realTimeDashboard.js').then(m => new m.RealTimeDashboard(3340).start())\"",
     "watch": "nodemon src/api/server.js",
     "forensics": "node src/cli/traversion-cli.js forensics",
     "status": "lsof -i :3333",

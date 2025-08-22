@@ -1,0 +1,765 @@
+import fetch from 'node-fetch';
+import { InputSanitizer } from '../security/inputSanitizer.js';
+import logger from '../utils/logger.js';
+
+/**
+ * Monitoring Tool Integrations
+ * 
+ * Connects with popular monitoring platforms to:
+ * - Fetch alerts and metrics data
+ * - Correlate incidents with monitoring events
+ * - Enrich incident context with observability data
+ * - Auto-create incidents from monitoring alerts
+ */
+export class MonitoringIntegrations {
+  constructor(config = {}) {
+    this.config = config;
+    this.integrations = new Map();
+    this.alertCorrelations = new Map();
+    
+    this.setupIntegrations();
+  }
+
+  setupIntegrations() {
+    // DataDog integration
+    if (this.config.datadog?.apiKey) {
+      this.integrations.set('datadog', new DataDogIntegration(this.config.datadog));
+    }
+
+    // New Relic integration
+    if (this.config.newrelic?.apiKey) {
+      this.integrations.set('newrelic', new NewRelicIntegration(this.config.newrelic));
+    }
+
+    // Grafana integration
+    if (this.config.grafana?.apiKey) {
+      this.integrations.set('grafana', new GrafanaIntegration(this.config.grafana));
+    }
+
+    // PagerDuty integration
+    if (this.config.pagerduty?.apiToken) {
+      this.integrations.set('pagerduty', new PagerDutyIntegration(this.config.pagerduty));
+    }
+
+    // Prometheus integration
+    if (this.config.prometheus?.endpoint) {
+      this.integrations.set('prometheus', new PrometheusIntegration(this.config.prometheus));
+    }
+
+    logger.info('Monitoring integrations initialized', {
+      integrations: Array.from(this.integrations.keys())
+    });
+  }
+
+  /**
+   * Enrich incident with monitoring data
+   */
+  async enrichIncidentWithMonitoringData(incident) {
+    const enrichedData = {
+      alerts: [],
+      metrics: {},
+      events: [],
+      dashboards: []
+    };
+
+    const startTime = new Date(incident.createdAt);
+    const endTime = incident.resolvedAt ? new Date(incident.resolvedAt) : new Date();
+    const lookbackMinutes = 60; // Look back 1 hour before incident
+
+    try {
+      // Fetch data from all configured integrations
+      const integrationPromises = Array.from(this.integrations.entries()).map(
+        async ([name, integration]) => {
+          try {
+            const data = await integration.fetchIncidentData(startTime, endTime, lookbackMinutes);
+            return { name, data };
+          } catch (error) {
+            logger.warn(`Failed to fetch data from ${name}`, { error: error.message });
+            return { name, data: null };
+          }
+        }
+      );
+
+      const results = await Promise.all(integrationPromises);
+
+      results.forEach(({ name, data }) => {
+        if (data) {
+          enrichedData.alerts.push(...(data.alerts || []));
+          enrichedData.metrics[name] = data.metrics || {};
+          enrichedData.events.push(...(data.events || []));
+          enrichedData.dashboards.push(...(data.dashboards || []));
+        }
+      });
+
+      // Correlate alerts with incident timing
+      enrichedData.correlatedAlerts = this.correlateAlertsWithIncident(enrichedData.alerts, incident);
+
+      // Generate insights from monitoring data
+      enrichedData.insights = this.generateMonitoringInsights(enrichedData, incident);
+
+      logger.info('Incident enriched with monitoring data', {
+        incidentId: incident.id,
+        alertsFound: enrichedData.alerts.length,
+        integrationsUsed: results.filter(r => r.data).length
+      });
+
+      return enrichedData;
+
+    } catch (error) {
+      logger.error('Failed to enrich incident with monitoring data', {
+        error: error.message,
+        incidentId: incident.id
+      });
+      return enrichedData;
+    }
+  }
+
+  /**
+   * Fetch alerts that may be related to an incident
+   */
+  async fetchRelevantAlerts(incident, timeWindow = 3600) {
+    const alerts = [];
+    const startTime = new Date(incident.createdAt);
+    const endTime = new Date(startTime.getTime() + timeWindow * 1000);
+
+    for (const [name, integration] of this.integrations) {
+      try {
+        const integrationAlerts = await integration.fetchAlerts(startTime, endTime);
+        alerts.push(...integrationAlerts.map(alert => ({ ...alert, source: name })));
+      } catch (error) {
+        logger.warn(`Failed to fetch alerts from ${name}`, { error: error.message });
+      }
+    }
+
+    return this.filterRelevantAlerts(alerts, incident);
+  }
+
+  /**
+   * Create incident from monitoring alert
+   */
+  async createIncidentFromAlert(alert, source) {
+    try {
+      const incident = {
+        title: this.generateIncidentTitle(alert),
+        description: this.generateIncidentDescription(alert),
+        severity: this.mapAlertSeverityToIncidentSeverity(alert.severity),
+        source: 'monitoring_alert',
+        monitoringSource: source,
+        alertId: alert.id,
+        affectedServices: this.extractAffectedServices(alert),
+        createdAt: new Date(),
+        metadata: {
+          originalAlert: alert,
+          autoGenerated: true
+        }
+      };
+
+      logger.info('Incident created from monitoring alert', {
+        alertId: alert.id,
+        source,
+        severity: incident.severity
+      });
+
+      return incident;
+
+    } catch (error) {
+      logger.error('Failed to create incident from alert', {
+        error: error.message,
+        alertId: alert.id,
+        source
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get monitoring dashboard URLs for incident
+   */
+  async getDashboardUrls(incident) {
+    const dashboards = [];
+
+    for (const [name, integration] of this.integrations) {
+      try {
+        const urls = await integration.getDashboardUrls(incident);
+        dashboards.push(...urls.map(url => ({ ...url, source: name })));
+      } catch (error) {
+        logger.debug(`Failed to get dashboard URLs from ${name}`, { error: error.message });
+      }
+    }
+
+    return dashboards;
+  }
+
+  /**
+   * Correlate alerts with incident timeline
+   */
+  correlateAlertsWithIncident(alerts, incident) {
+    const incidentStart = new Date(incident.createdAt);
+    const incidentEnd = incident.resolvedAt ? new Date(incident.resolvedAt) : new Date();
+
+    return alerts.map(alert => {
+      const alertTime = new Date(alert.timestamp);
+      const correlation = this.calculateAlertCorrelation(alert, incident, alertTime, incidentStart, incidentEnd);
+
+      return {
+        ...alert,
+        correlation
+      };
+    }).filter(alert => alert.correlation.relevanceScore > 0.3)
+      .sort((a, b) => b.correlation.relevanceScore - a.correlation.relevanceScore);
+  }
+
+  calculateAlertCorrelation(alert, incident, alertTime, incidentStart, incidentEnd) {
+    let relevanceScore = 0;
+    const reasons = [];
+
+    // Time proximity scoring
+    const timeProximity = this.calculateTimeProximity(alertTime, incidentStart, incidentEnd);
+    relevanceScore += timeProximity * 0.4;
+    
+    if (timeProximity > 0.7) {
+      reasons.push('Alert occurred close to incident time');
+    }
+
+    // Service/component matching
+    const serviceMatch = this.calculateServiceMatch(alert, incident);
+    relevanceScore += serviceMatch * 0.3;
+    
+    if (serviceMatch > 0.5) {
+      reasons.push('Alert involves same services as incident');
+    }
+
+    // Severity correlation
+    const severityMatch = this.calculateSeverityMatch(alert, incident);
+    relevanceScore += severityMatch * 0.2;
+
+    // Keywords matching
+    const keywordMatch = this.calculateKeywordMatch(alert, incident);
+    relevanceScore += keywordMatch * 0.1;
+
+    if (keywordMatch > 0.5) {
+      reasons.push('Alert description matches incident keywords');
+    }
+
+    return {
+      relevanceScore: Math.min(relevanceScore, 1.0),
+      reasons,
+      timeProximity,
+      serviceMatch,
+      severityMatch,
+      keywordMatch
+    };
+  }
+
+  generateMonitoringInsights(monitoringData, incident) {
+    const insights = [];
+
+    // Alert pattern insights
+    if (monitoringData.correlatedAlerts.length > 3) {
+      insights.push({
+        type: 'alert_storm',
+        severity: 'high',
+        description: `${monitoringData.correlatedAlerts.length} correlated alerts detected`,
+        recommendation: 'Investigate potential cascade failure or monitoring noise'
+      });
+    }
+
+    // Missing monitoring insights
+    const hasRelevantAlerts = monitoringData.correlatedAlerts.length > 0;
+    if (!hasRelevantAlerts && incident.severity === 'critical') {
+      insights.push({
+        type: 'monitoring_gap',
+        severity: 'medium',
+        description: 'Critical incident with no monitoring alerts',
+        recommendation: 'Review monitoring coverage for affected services'
+      });
+    }
+
+    // Metric anomaly insights
+    Object.entries(monitoringData.metrics).forEach(([source, metrics]) => {
+      if (metrics.anomalies && metrics.anomalies.length > 0) {
+        insights.push({
+          type: 'metric_anomaly',
+          severity: 'medium',
+          description: `${metrics.anomalies.length} metric anomalies detected in ${source}`,
+          recommendation: 'Investigate metric anomalies for root cause indicators'
+        });
+      }
+    });
+
+    return insights;
+  }
+
+  // Helper methods for correlation scoring
+  calculateTimeProximity(alertTime, incidentStart, incidentEnd) {
+    const alertTimestamp = alertTime.getTime();
+    const incidentStartTimestamp = incidentStart.getTime();
+    const incidentEndTimestamp = incidentEnd.getTime();
+
+    // If alert is within incident timeframe, high score
+    if (alertTimestamp >= incidentStartTimestamp && alertTimestamp <= incidentEndTimestamp) {
+      return 1.0;
+    }
+
+    // Calculate proximity before incident (more relevant than after)
+    const timeDiffMs = Math.abs(alertTimestamp - incidentStartTimestamp);
+    const maxRelevantDiffMs = 3600000; // 1 hour
+
+    if (timeDiffMs > maxRelevantDiffMs) {
+      return 0;
+    }
+
+    return Math.max(0, 1 - (timeDiffMs / maxRelevantDiffMs));
+  }
+
+  calculateServiceMatch(alert, incident) {
+    const alertServices = this.extractServicesFromAlert(alert);
+    const incidentServices = incident.affectedServices || [];
+
+    if (alertServices.length === 0 || incidentServices.length === 0) {
+      return 0;
+    }
+
+    const commonServices = alertServices.filter(service => 
+      incidentServices.includes(service)
+    );
+
+    return commonServices.length / Math.max(alertServices.length, incidentServices.length);
+  }
+
+  calculateSeverityMatch(alert, incident) {
+    const severityMapping = {
+      'critical': 4,
+      'high': 3,
+      'medium': 2,
+      'low': 1
+    };
+
+    const alertSeverity = severityMapping[alert.severity] || 2;
+    const incidentSeverity = severityMapping[incident.severity] || 2;
+
+    const diff = Math.abs(alertSeverity - incidentSeverity);
+    return Math.max(0, (4 - diff) / 4);
+  }
+
+  calculateKeywordMatch(alert, incident) {
+    const alertText = `${alert.title || ''} ${alert.description || ''}`.toLowerCase();
+    const incidentText = `${incident.title || ''} ${incident.description || ''}`.toLowerCase();
+
+    const alertWords = new Set(alertText.split(/\s+/).filter(word => word.length > 3));
+    const incidentWords = new Set(incidentText.split(/\s+/).filter(word => word.length > 3));
+
+    if (alertWords.size === 0 || incidentWords.size === 0) {
+      return 0;
+    }
+
+    const commonWords = [...alertWords].filter(word => incidentWords.has(word));
+    return commonWords.length / Math.max(alertWords.size, incidentWords.size);
+  }
+
+  extractServicesFromAlert(alert) {
+    const services = [];
+    
+    // Extract from tags
+    if (alert.tags) {
+      alert.tags.forEach(tag => {
+        if (tag.startsWith('service:')) {
+          services.push(tag.substring(8));
+        }
+      });
+    }
+
+    // Extract from message/title
+    const text = `${alert.title || ''} ${alert.message || ''}`.toLowerCase();
+    const servicePatterns = [
+      /service[:\s](\w+)/g,
+      /component[:\s](\w+)/g,
+      /application[:\s](\w+)/g
+    ];
+
+    servicePatterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        services.push(match[1]);
+      }
+    });
+
+    return [...new Set(services)];
+  }
+
+  filterRelevantAlerts(alerts, incident) {
+    return alerts.filter(alert => {
+      // Filter by time window
+      const alertTime = new Date(alert.timestamp);
+      const incidentTime = new Date(incident.createdAt);
+      const timeDiff = Math.abs(alertTime - incidentTime);
+      
+      // Only alerts within 2 hours of incident
+      return timeDiff <= 7200000;
+    });
+  }
+
+  generateIncidentTitle(alert) {
+    return InputSanitizer.sanitizeHTML(alert.title || `Monitoring Alert: ${alert.id}`);
+  }
+
+  generateIncidentDescription(alert) {
+    let description = `Automatically created from monitoring alert.\n\n`;
+    description += `Alert: ${alert.title || 'N/A'}\n`;
+    description += `Message: ${alert.message || alert.description || 'N/A'}\n`;
+    description += `Source: ${alert.source || 'Unknown'}\n`;
+    
+    if (alert.tags && alert.tags.length > 0) {
+      description += `Tags: ${alert.tags.join(', ')}\n`;
+    }
+
+    return InputSanitizer.sanitizeHTML(description);
+  }
+
+  mapAlertSeverityToIncidentSeverity(alertSeverity) {
+    const mapping = {
+      'critical': 'critical',
+      'error': 'high',
+      'warning': 'medium',
+      'info': 'low',
+      'ok': 'low'
+    };
+
+    return mapping[alertSeverity?.toLowerCase()] || 'medium';
+  }
+
+  extractAffectedServices(alert) {
+    return this.extractServicesFromAlert(alert);
+  }
+}
+
+/**
+ * DataDog Integration
+ */
+class DataDogIntegration {
+  constructor(config) {
+    this.apiKey = config.apiKey;
+    this.appKey = config.appKey;
+    this.baseUrl = config.baseUrl || 'https://api.datadoghq.com/api/v1';
+  }
+
+  async fetchIncidentData(startTime, endTime, lookbackMinutes) {
+    const data = {
+      alerts: [],
+      metrics: {},
+      events: []
+    };
+
+    try {
+      // Fetch alerts/monitors
+      const monitors = await this.fetchMonitors(startTime, endTime);
+      data.alerts = monitors.map(this.convertMonitorToAlert);
+
+      // Fetch events
+      const events = await this.fetchEvents(startTime, endTime);
+      data.events = events;
+
+      // Fetch key metrics
+      data.metrics = await this.fetchMetrics(startTime, endTime);
+
+    } catch (error) {
+      logger.error('DataDog integration error', { error: error.message });
+    }
+
+    return data;
+  }
+
+  async fetchMonitors(startTime, endTime) {
+    const response = await this.apiRequest('/monitor', {
+      group_states: 'all',
+      with_downtimes: true
+    });
+
+    return response.filter(monitor => {
+      return monitor.overall_state !== 'OK' || this.wasTriggeredDuring(monitor, startTime, endTime);
+    });
+  }
+
+  async fetchEvents(startTime, endTime) {
+    const response = await this.apiRequest('/events', {
+      start: Math.floor(startTime.getTime() / 1000),
+      end: Math.floor(endTime.getTime() / 1000),
+      priority: 'normal,low',
+      sources: 'nagios,hudson,jenkins,user,my apps,feed,chef,puppet,git,bitbucket,fabric,capistrano'
+    });
+
+    return response.events || [];
+  }
+
+  async fetchMetrics(startTime, endTime) {
+    const queries = [
+      'avg:system.cpu.user',
+      'avg:system.mem.pct_usable',
+      'avg:system.load.1',
+      'sum:system.net.bytes_rcvd',
+      'sum:system.net.bytes_sent'
+    ];
+
+    const metrics = {};
+    
+    for (const query of queries) {
+      try {
+        const response = await this.apiRequest('/query', {
+          query,
+          from: Math.floor(startTime.getTime() / 1000),
+          to: Math.floor(endTime.getTime() / 1000)
+        });
+
+        metrics[query] = response;
+      } catch (error) {
+        logger.debug(`Failed to fetch DataDog metric ${query}`, { error: error.message });
+      }
+    }
+
+    return metrics;
+  }
+
+  async getDashboardUrls(incident) {
+    // Return relevant DataDog dashboard URLs
+    return [
+      {
+        name: 'Infrastructure Dashboard',
+        url: `https://app.datadoghq.com/dashboard/infrastructure`,
+        description: 'System metrics and alerts'
+      }
+    ];
+  }
+
+  async apiRequest(endpoint, params = {}) {
+    const url = new URL(endpoint, this.baseUrl);
+    Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+    url.searchParams.append('api_key', this.apiKey);
+    url.searchParams.append('application_key', this.appKey);
+
+    const response = await fetch(url.toString());
+    
+    if (!response.ok) {
+      throw new Error(`DataDog API error: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  convertMonitorToAlert(monitor) {
+    return {
+      id: monitor.id.toString(),
+      title: monitor.name,
+      message: monitor.message,
+      severity: this.convertDataDogState(monitor.overall_state),
+      timestamp: new Date(monitor.modified * 1000),
+      tags: monitor.tags,
+      source: 'datadog',
+      state: monitor.overall_state
+    };
+  }
+
+  convertDataDogState(state) {
+    const mapping = {
+      'Alert': 'critical',
+      'Warn': 'medium',
+      'No Data': 'low',
+      'OK': 'low'
+    };
+
+    return mapping[state] || 'medium';
+  }
+
+  wasTriggeredDuring(monitor, startTime, endTime) {
+    // Check if monitor was triggered during the time window
+    // This would require more detailed API calls to monitor history
+    return false;
+  }
+}
+
+/**
+ * New Relic Integration
+ */
+class NewRelicIntegration {
+  constructor(config) {
+    this.apiKey = config.apiKey;
+    this.baseUrl = config.baseUrl || 'https://api.newrelic.com/v2';
+  }
+
+  async fetchIncidentData(startTime, endTime, lookbackMinutes) {
+    const data = {
+      alerts: [],
+      metrics: {},
+      events: []
+    };
+
+    try {
+      // New Relic implementation would go here
+      data.alerts = await this.fetchAlerts(startTime, endTime);
+      data.events = await this.fetchDeployments(startTime, endTime);
+      data.metrics = await this.fetchApplicationMetrics(startTime, endTime);
+
+    } catch (error) {
+      logger.error('New Relic integration error', { error: error.message });
+    }
+
+    return data;
+  }
+
+  async fetchAlerts(startTime, endTime) {
+    // Implementation for New Relic alerts
+    return [];
+  }
+
+  async fetchDeployments(startTime, endTime) {
+    // Implementation for New Relic deployment events
+    return [];
+  }
+
+  async fetchApplicationMetrics(startTime, endTime) {
+    // Implementation for New Relic metrics
+    return {};
+  }
+
+  async getDashboardUrls(incident) {
+    return [
+      {
+        name: 'APM Overview',
+        url: 'https://one.newrelic.com/launcher/apm.overview',
+        description: 'Application performance monitoring'
+      }
+    ];
+  }
+}
+
+/**
+ * Grafana Integration
+ */
+class GrafanaIntegration {
+  constructor(config) {
+    this.apiKey = config.apiKey;
+    this.baseUrl = config.baseUrl;
+  }
+
+  async fetchIncidentData(startTime, endTime, lookbackMinutes) {
+    const data = {
+      alerts: [],
+      metrics: {},
+      dashboards: []
+    };
+
+    try {
+      data.alerts = await this.fetchAlerts(startTime, endTime);
+      data.dashboards = await this.fetchDashboards();
+
+    } catch (error) {
+      logger.error('Grafana integration error', { error: error.message });
+    }
+
+    return data;
+  }
+
+  async fetchAlerts(startTime, endTime) {
+    // Grafana alerting API implementation
+    return [];
+  }
+
+  async fetchDashboards() {
+    // Fetch relevant dashboards
+    return [];
+  }
+
+  async getDashboardUrls(incident) {
+    return [];
+  }
+}
+
+/**
+ * PagerDuty Integration
+ */
+class PagerDutyIntegration {
+  constructor(config) {
+    this.apiToken = config.apiToken;
+    this.baseUrl = 'https://api.pagerduty.com';
+  }
+
+  async fetchIncidentData(startTime, endTime, lookbackMinutes) {
+    const data = {
+      alerts: [],
+      events: []
+    };
+
+    try {
+      data.alerts = await this.fetchIncidents(startTime, endTime);
+
+    } catch (error) {
+      logger.error('PagerDuty integration error', { error: error.message });
+    }
+
+    return data;
+  }
+
+  async fetchIncidents(startTime, endTime) {
+    // PagerDuty incidents API implementation
+    return [];
+  }
+
+  async getDashboardUrls(incident) {
+    return [
+      {
+        name: 'PagerDuty Incidents',
+        url: 'https://app.pagerduty.com/incidents',
+        description: 'Current incidents and alerts'
+      }
+    ];
+  }
+}
+
+/**
+ * Prometheus Integration
+ */
+class PrometheusIntegration {
+  constructor(config) {
+    this.endpoint = config.endpoint;
+    this.username = config.username;
+    this.password = config.password;
+  }
+
+  async fetchIncidentData(startTime, endTime, lookbackMinutes) {
+    const data = {
+      alerts: [],
+      metrics: {}
+    };
+
+    try {
+      data.alerts = await this.fetchAlerts();
+      data.metrics = await this.fetchMetrics(startTime, endTime);
+
+    } catch (error) {
+      logger.error('Prometheus integration error', { error: error.message });
+    }
+
+    return data;
+  }
+
+  async fetchAlerts() {
+    // Prometheus Alertmanager API implementation
+    return [];
+  }
+
+  async fetchMetrics(startTime, endTime) {
+    // Prometheus metrics query implementation
+    return {};
+  }
+
+  async getDashboardUrls(incident) {
+    return [
+      {
+        name: 'Prometheus Metrics',
+        url: `${this.endpoint}/graph`,
+        description: 'Metrics and queries'
+      }
+    ];
+  }
+}
+
+export default MonitoringIntegrations;
