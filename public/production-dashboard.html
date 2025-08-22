@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traversion Production Dashboard - Time Travel Debugging</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%);
+            color: #e0e0e0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(26, 26, 62, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.2);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            background: linear-gradient(135deg, #64ffda, #7b68ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-healthy { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+        .status-degraded { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+        .status-critical { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+
+        /* Time Travel Controls */
+        .time-travel-section {
+            background: rgba(26, 26, 62, 0.5);
+            padding: 20px 30px;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .current-time {
+            font-size: 28px;
+            font-weight: 300;
+            color: #64ffda;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+
+        .time-info {
+            display: flex;
+            gap: 30px;
+            font-size: 14px;
+            color: #999;
+        }
+
+        .timeline-container {
+            position: relative;
+            height: 80px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .timeline-track {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: rgba(100, 255, 218, 0.1);
+            transform: translateY(-50%);
+        }
+
+        .timeline-progress {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #64ffda, #7b68ee);
+            transform: translateY(-50%);
+            transition: width 0.3s ease;
+        }
+
+        .timeline-events {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        .event-marker {
+            position: absolute;
+            width: 2px;
+            height: 100%;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .event-marker.error { background: rgba(244, 67, 54, 0.6); }
+        .event-marker.warning { background: rgba(255, 193, 7, 0.6); }
+        .event-marker.normal { background: rgba(100, 255, 218, 0.2); }
+
+        .event-marker:hover {
+            opacity: 1;
+            width: 4px;
+        }
+
+        .timeline-slider {
+            position: absolute;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            background: #fff;
+            cursor: grab;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .timeline-slider::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -7px;
+            width: 16px;
+            height: 16px;
+            background: #64ffda;
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(100, 255, 218, 0.8);
+        }
+
+        .playback-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .playback-btn {
+            background: rgba(100, 255, 218, 0.1);
+            border: 1px solid rgba(100, 255, 218, 0.3);
+            color: #64ffda;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .playback-btn:hover {
+            background: rgba(100, 255, 218, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: 20px;
+            padding-left: 20px;
+            border-left: 1px solid rgba(100, 255, 218, 0.2);
+        }
+
+        /* Main Dashboard */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            height: calc(100vh - 280px);
+            overflow-y: auto;
+        }
+
+        .dashboard-card {
+            background: rgba(26, 26, 62, 0.4);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(5px);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
+        }
+
+        .card-title {
+            font-size: 16px;
+            color: #64ffda;
+            font-weight: 500;
+        }
+
+        .card-value {
+            font-size: 32px;
+            font-weight: 300;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+
+        .card-subtitle {
+            font-size: 12px;
+            color: #999;
+        }
+
+        /* Causality Graph */
+        .causality-graph {
+            grid-column: span 2;
+            grid-row: span 2;
+        }
+
+        #causalityCanvas {
+            width: 100%;
+            height: 400px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        /* Event Stream */
+        .event-stream {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .event-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            border-left: 3px solid;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .event-item.error { border-color: #f44336; }
+        .event-item.warning { border-color: #ffc107; }
+        .event-item.info { border-color: #64ffda; }
+
+        .event-time {
+            font-size: 11px;
+            color: #666;
+        }
+
+        /* System Metrics */
+        .metric-bar {
+            height: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .metric-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #64ffda, #7b68ee);
+            transition: width 0.3s ease;
+        }
+
+        /* TimeQL Console */
+        .timeql-console {
+            grid-column: span 3;
+            max-height: 200px;
+        }
+
+        .query-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            color: #64ffda;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: 'Monaco', monospace;
+            font-size: 14px;
+        }
+
+        .query-results {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            max-height: 100px;
+            overflow-y: auto;
+            font-family: 'Monaco', monospace;
+            font-size: 12px;
+            color: #999;
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes slide-in {
+            from {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .slide-in {
+            animation: slide-in 0.3s ease-out;
+        }
+
+        /* Tooltips */
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+        }
+
+        /* Loading State */
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(100, 255, 218, 0.2);
+            border-top-color: #64ffda;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">
+            <h1>⏰ Traversion</h1>
+            <span style="color: #999;">Production Time Machine</span>
+        </div>
+        <div class="status-badge status-healthy" id="systemStatus">System Healthy</div>
+    </div>
+
+    <!-- Time Travel Controls -->
+    <div class="time-travel-section">
+        <div class="time-display">
+            <div class="current-time" id="currentTime">2024-01-15 15:47:23.456</div>
+            <div class="time-info">
+                <span>Events: <strong id="eventCount">0</strong></span>
+                <span>Services: <strong id="serviceCount">0</strong></span>
+                <span>Errors: <strong id="errorCount">0</strong></span>
+            </div>
+        </div>
+
+        <div class="timeline-container" id="timeline">
+            <div class="timeline-track"></div>
+            <div class="timeline-progress" id="timelineProgress"></div>
+            <div class="timeline-events" id="timelineEvents"></div>
+            <div class="timeline-slider" id="timelineSlider"></div>
+        </div>
+
+        <div class="playback-controls">
+            <button class="playback-btn" onclick="rewind()">⏪ Rewind</button>
+            <button class="playback-btn" onclick="playPause()" id="playBtn">▶️ Play</button>
+            <button class="playback-btn" onclick="fastForward()">⏩ Forward</button>
+            <button class="playback-btn" onclick="jumpToNow()">📍 Now</button>
+            
+            <div class="speed-control">
+                <span>Speed:</span>
+                <select id="playbackSpeed" onchange="updateSpeed()">
+                    <option value="0.5">0.5x</option>
+                    <option value="1" selected>1x</option>
+                    <option value="2">2x</option>
+                    <option value="5">5x</option>
+                    <option value="10">10x</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div class="dashboard-grid">
+        <!-- Causality Graph -->
+        <div class="dashboard-card causality-graph">
+            <div class="card-header">
+                <h3 class="card-title">Causality Graph</h3>
+                <span style="font-size: 12px; color: #666;">Real-time cause & effect</span>
+            </div>
+            <canvas id="causalityCanvas"></canvas>
+        </div>
+
+        <!-- System Metrics -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3 class="card-title">System Metrics</h3>
+            </div>
+            <div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span>CPU Usage</span>
+                    <span id="cpuValue">0%</span>
+                </div>
+                <div class="metric-bar">
+                    <div class="metric-fill" id="cpuBar" style="width: 0%"></div>
+                </div>
+            </div>
+            <div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span>Memory</span>
+                    <span id="memValue">0%</span>
+                </div>
+                <div class="metric-bar">
+                    <div class="metric-fill" id="memBar" style="width: 0%"></div>
+                </div>
+            </div>
+            <div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span>Request Rate</span>
+                    <span id="rpsValue">0/s</span>
+                </div>
+                <div class="metric-bar">
+                    <div class="metric-fill" id="rpsBar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Event Stream -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3 class="card-title">Event Stream</h3>
+            </div>
+            <div class="event-stream" id="eventStream">
+                <!-- Events will be added here -->
+            </div>
+        </div>
+
+        <!-- Root Cause Analysis -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3 class="card-title">Root Cause Analysis</h3>
+            </div>
+            <div id="rootCause">
+                <p style="color: #666; font-size: 14px;">No issues detected</p>
+            </div>
+        </div>
+
+        <!-- Predictions -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3 class="card-title">Predictions</h3>
+            </div>
+            <div id="predictions">
+                <p style="color: #666; font-size: 14px;">Analyzing patterns...</p>
+            </div>
+        </div>
+
+        <!-- TimeQL Console -->
+        <div class="dashboard-card timeql-console">
+            <div class="card-header">
+                <h3 class="card-title">TimeQL Console</h3>
+                <span style="font-size: 12px; color: #666;">Query any point in time</span>
+            </div>
+            <input type="text" class="query-input" id="queryInput" 
+                   placeholder="STATE AT '2024-01-15 15:45:00' WHERE service = 'api-gateway'"
+                   onkeypress="if(event.key === 'Enter') executeQuery()">
+            <div class="query-results" id="queryResults">
+                Ready for TimeQL queries...
+            </div>
+        </div>
+    </div>
+
+    <!-- Tooltip -->
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // Dashboard State
+        let dashboardState = {
+            currentTime: Date.now(),
+            startTime: Date.now() - 3600000, // 1 hour ago
+            endTime: Date.now(),
+            playing: false,
+            playbackSpeed: 1,
+            events: [],
+            services: new Set(),
+            errors: []
+        };
+
+        // Initialize WebSocket connection
+        let ws = null;
+        
+        function connectWebSocket() {
+            ws = new WebSocket('ws://localhost:3334');
+            
+            ws.onopen = () => {
+                console.log('Connected to Traversion');
+                document.getElementById('systemStatus').textContent = 'Connected';
+                document.getElementById('systemStatus').className = 'status-badge status-healthy';
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleRealtimeEvent(data);
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                document.getElementById('systemStatus').textContent = 'Connection Error';
+                document.getElementById('systemStatus').className = 'status-badge status-critical';
+            };
+            
+            ws.onclose = () => {
+                document.getElementById('systemStatus').textContent = 'Disconnected';
+                document.getElementById('systemStatus').className = 'status-badge status-degraded';
+                // Reconnect after 3 seconds
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        // Handle real-time events
+        function handleRealtimeEvent(data) {
+            // Add to events array
+            dashboardState.events.push(data);
+            
+            // Update service count
+            if (data.serviceId) {
+                dashboardState.services.add(data.serviceId);
+            }
+            
+            // Track errors
+            if (data.eventType === 'error' || data.data?.error) {
+                dashboardState.errors.push(data);
+            }
+            
+            // Update UI
+            updateDashboard();
+            
+            // Add event marker to timeline
+            addEventMarker(data);
+            
+            // Add to event stream
+            addEventToStream(data);
+        }
+
+        // Update dashboard metrics
+        function updateDashboard() {
+            document.getElementById('eventCount').textContent = dashboardState.events.length;
+            document.getElementById('serviceCount').textContent = dashboardState.services.size;
+            document.getElementById('errorCount').textContent = dashboardState.errors.length;
+            
+            // Update current time display
+            const date = new Date(dashboardState.currentTime);
+            document.getElementById('currentTime').textContent = 
+                date.toISOString().replace('T', ' ').slice(0, -1);
+        }
+
+        // Timeline functions
+        function initTimeline() {
+            const timeline = document.getElementById('timeline');
+            const slider = document.getElementById('timelineSlider');
+            let isDragging = false;
+            
+            slider.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                slider.style.cursor = 'grabbing';
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                
+                const rect = timeline.getBoundingClientRect();
+                const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+                const percentage = x / rect.width;
+                
+                slider.style.left = x + 'px';
+                document.getElementById('timelineProgress').style.width = (percentage * 100) + '%';
+                
+                // Update current time based on slider position
+                const timeRange = dashboardState.endTime - dashboardState.startTime;
+                dashboardState.currentTime = dashboardState.startTime + (timeRange * percentage);
+                updateDashboard();
+                updateSystemState();
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+                slider.style.cursor = 'grab';
+            });
+        }
+
+        // Add event marker to timeline
+        function addEventMarker(event) {
+            const timeline = document.getElementById('timelineEvents');
+            const marker = document.createElement('div');
+            marker.className = 'event-marker';
+            
+            // Determine marker type
+            if (event.eventType === 'error' || event.data?.error) {
+                marker.classList.add('error');
+            } else if (event.data?.warning) {
+                marker.classList.add('warning');
+            } else {
+                marker.classList.add('normal');
+            }
+            
+            // Calculate position
+            const timeRange = dashboardState.endTime - dashboardState.startTime;
+            const relativeTime = event.timestamp - dashboardState.startTime;
+            const percentage = (relativeTime / timeRange) * 100;
+            marker.style.left = percentage + '%';
+            
+            // Add tooltip
+            marker.addEventListener('mouseenter', (e) => {
+                showTooltip(e, event);
+            });
+            
+            marker.addEventListener('mouseleave', () => {
+                hideTooltip();
+            });
+            
+            timeline.appendChild(marker);
+        }
+
+        // Add event to stream
+        function addEventToStream(event) {
+            const stream = document.getElementById('eventStream');
+            const item = document.createElement('div');
+            item.className = 'event-item slide-in';
+            
+            // Determine event type for styling
+            if (event.eventType === 'error') {
+                item.classList.add('error');
+            } else if (event.eventType === 'warning') {
+                item.classList.add('warning');
+            } else {
+                item.classList.add('info');
+            }
+            
+            item.innerHTML = `
+                <div>
+                    <strong>${event.eventType}</strong>
+                    <div style="font-size: 11px; color: #666; margin-top: 2px;">
+                        ${event.serviceName || event.serviceId || 'Unknown Service'}
+                    </div>
+                </div>
+                <div class="event-time">
+                    ${new Date(event.timestamp).toLocaleTimeString()}
+                </div>
+            `;
+            
+            // Add to top of stream
+            stream.insertBefore(item, stream.firstChild);
+            
+            // Limit to 10 items
+            while (stream.children.length > 10) {
+                stream.removeChild(stream.lastChild);
+            }
+        }
+
+        // Playback controls
+        function playPause() {
+            dashboardState.playing = !dashboardState.playing;
+            const btn = document.getElementById('playBtn');
+            btn.textContent = dashboardState.playing ? '⏸ Pause' : '▶️ Play';
+            
+            if (dashboardState.playing) {
+                startPlayback();
+            }
+        }
+
+        function startPlayback() {
+            if (!dashboardState.playing) return;
+            
+            // Advance time
+            const increment = 100 * dashboardState.playbackSpeed; // 100ms * speed
+            dashboardState.currentTime += increment;
+            
+            // Loop back if we reach the end
+            if (dashboardState.currentTime > dashboardState.endTime) {
+                dashboardState.currentTime = dashboardState.startTime;
+            }
+            
+            // Update slider position
+            const timeRange = dashboardState.endTime - dashboardState.startTime;
+            const percentage = ((dashboardState.currentTime - dashboardState.startTime) / timeRange) * 100;
+            document.getElementById('timelineSlider').style.left = percentage + '%';
+            document.getElementById('timelineProgress').style.width = percentage + '%';
+            
+            updateDashboard();
+            updateSystemState();
+            
+            // Continue playback
+            setTimeout(startPlayback, 100);
+        }
+
+        function rewind() {
+            dashboardState.currentTime = Math.max(
+                dashboardState.startTime,
+                dashboardState.currentTime - 10000 // 10 seconds
+            );
+            updateTimelinePosition();
+        }
+
+        function fastForward() {
+            dashboardState.currentTime = Math.min(
+                dashboardState.endTime,
+                dashboardState.currentTime + 10000 // 10 seconds
+            );
+            updateTimelinePosition();
+        }
+
+        function jumpToNow() {
+            dashboardState.currentTime = dashboardState.endTime;
+            updateTimelinePosition();
+        }
+
+        function updateSpeed() {
+            const speed = document.getElementById('playbackSpeed').value;
+            dashboardState.playbackSpeed = parseFloat(speed);
+        }
+
+        function updateTimelinePosition() {
+            const timeRange = dashboardState.endTime - dashboardState.startTime;
+            const percentage = ((dashboardState.currentTime - dashboardState.startTime) / timeRange) * 100;
+            document.getElementById('timelineSlider').style.left = percentage + '%';
+            document.getElementById('timelineProgress').style.width = percentage + '%';
+            updateDashboard();
+            updateSystemState();
+        }
+
+        // Update system state based on current time
+        function updateSystemState() {
+            // Get events up to current time
+            const currentEvents = dashboardState.events.filter(e => e.timestamp <= dashboardState.currentTime);
+            
+            // Calculate metrics
+            const recentEvents = currentEvents.filter(e => 
+                e.timestamp > dashboardState.currentTime - 5000 // Last 5 seconds
+            );
+            
+            // Update metrics display
+            updateMetrics(recentEvents);
+            
+            // Update causality graph
+            updateCausalityGraph(currentEvents);
+            
+            // Check for issues and update root cause
+            checkForIssues(currentEvents);
+        }
+
+        // Update metrics display
+        function updateMetrics(events) {
+            // Simulate metrics based on events
+            const errorRate = events.filter(e => e.eventType === 'error').length / Math.max(events.length, 1);
+            const cpu = Math.min(95, 30 + (errorRate * 65) + Math.random() * 10);
+            const mem = Math.min(90, 40 + (errorRate * 50) + Math.random() * 5);
+            const rps = events.length * 12; // Events per 5 seconds * 12 = per minute
+            
+            document.getElementById('cpuValue').textContent = cpu.toFixed(1) + '%';
+            document.getElementById('cpuBar').style.width = cpu + '%';
+            
+            document.getElementById('memValue').textContent = mem.toFixed(1) + '%';
+            document.getElementById('memBar').style.width = mem + '%';
+            
+            document.getElementById('rpsValue').textContent = rps + '/m';
+            document.getElementById('rpsBar').style.width = Math.min(100, rps / 10) + '%';
+            
+            // Update system status
+            const status = document.getElementById('systemStatus');
+            if (errorRate > 0.1) {
+                status.textContent = 'System Critical';
+                status.className = 'status-badge status-critical pulse';
+            } else if (errorRate > 0.05) {
+                status.textContent = 'System Degraded';
+                status.className = 'status-badge status-degraded';
+            } else {
+                status.textContent = 'System Healthy';
+                status.className = 'status-badge status-healthy';
+            }
+        }
+
+        // Update causality graph visualization
+        function updateCausalityGraph(events) {
+            const canvas = document.getElementById('causalityCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw a simple causality visualization
+            const nodes = [];
+            const edges = [];
+            
+            // Create nodes for recent events
+            const recentEvents = events.slice(-20); // Last 20 events
+            recentEvents.forEach((event, i) => {
+                const x = (i / recentEvents.length) * canvas.width + 20;
+                const y = canvas.height / 2 + Math.sin(i * 0.5) * 100;
+                nodes.push({ x, y, event });
+                
+                // Connect to previous event
+                if (i > 0) {
+                    edges.push({ from: i - 1, to: i });
+                }
+            });
+            
+            // Draw edges
+            ctx.strokeStyle = 'rgba(100, 255, 218, 0.2)';
+            ctx.lineWidth = 1;
+            edges.forEach(edge => {
+                ctx.beginPath();
+                ctx.moveTo(nodes[edge.from].x, nodes[edge.from].y);
+                ctx.lineTo(nodes[edge.to].x, nodes[edge.to].y);
+                ctx.stroke();
+            });
+            
+            // Draw nodes
+            nodes.forEach(node => {
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, 5, 0, Math.PI * 2);
+                
+                if (node.event.eventType === 'error') {
+                    ctx.fillStyle = '#f44336';
+                } else {
+                    ctx.fillStyle = '#64ffda';
+                }
+                ctx.fill();
+            });
+        }
+
+        // Check for issues and update root cause
+        function checkForIssues(events) {
+            const errors = events.filter(e => e.eventType === 'error');
+            const rootCauseDiv = document.getElementById('rootCause');
+            
+            if (errors.length > 0) {
+                const lastError = errors[errors.length - 1];
+                rootCauseDiv.innerHTML = `
+                    <div style="color: #f44336; font-weight: 500; margin-bottom: 10px;">
+                        Issue Detected
+                    </div>
+                    <div style="font-size: 13px; color: #ccc; margin-bottom: 5px;">
+                        ${lastError.data?.message || 'Unknown error'}
+                    </div>
+                    <div style="font-size: 12px; color: #666;">
+                        Service: ${lastError.serviceName || lastError.serviceId}<br>
+                        Time: ${new Date(lastError.timestamp).toLocaleTimeString()}
+                    </div>
+                    <button class="playback-btn" style="margin-top: 10px; font-size: 12px;" 
+                            onclick="jumpToEvent('${lastError.eventId}')">
+                        🔍 Investigate
+                    </button>
+                `;
+            } else {
+                rootCauseDiv.innerHTML = '<p style="color: #666; font-size: 14px;">No issues detected</p>';
+            }
+        }
+
+        // Execute TimeQL query
+        function executeQuery() {
+            const input = document.getElementById('queryInput');
+            const results = document.getElementById('queryResults');
+            const query = input.value;
+            
+            if (!query) return;
+            
+            results.textContent = 'Executing query...';
+            
+            // Simulate query execution
+            setTimeout(() => {
+                try {
+                    // Parse and execute query (simplified)
+                    if (query.includes('STATE AT')) {
+                        results.innerHTML = `<span style="color: #64ffda;">Query executed successfully</span><br>
+                        System State: { services: ${dashboardState.services.size}, events: ${dashboardState.events.length}, status: "healthy" }`;
+                    } else if (query.includes('TRAVERSE')) {
+                        results.innerHTML = `<span style="color: #64ffda;">Causality chain traced</span><br>
+                        Found ${Math.floor(Math.random() * 10) + 5} events in chain`;
+                    } else {
+                        results.innerHTML = `<span style="color: #ffc107;">Unknown query type</span>`;
+                    }
+                } catch (error) {
+                    results.innerHTML = `<span style="color: #f44336;">Error: ${error.message}</span>`;
+                }
+            }, 500);
+        }
+
+        // Tooltip functions
+        function showTooltip(e, event) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.innerHTML = `
+                <strong>${event.eventType}</strong><br>
+                Service: ${event.serviceName || event.serviceId}<br>
+                Time: ${new Date(event.timestamp).toLocaleTimeString()}
+            `;
+            tooltip.style.display = 'block';
+            tooltip.style.left = e.pageX + 10 + 'px';
+            tooltip.style.top = e.pageY - 30 + 'px';
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').style.display = 'none';
+        }
+
+        // Jump to specific event
+        function jumpToEvent(eventId) {
+            const event = dashboardState.events.find(e => e.eventId === eventId);
+            if (event) {
+                dashboardState.currentTime = event.timestamp;
+                updateTimelinePosition();
+            }
+        }
+
+        // Generate sample data for demo
+        function generateSampleData() {
+            const now = Date.now();
+            const services = ['api-gateway', 'auth-service', 'database', 'cache', 'payment-service'];
+            const eventTypes = ['http:request', 'http:response', 'database:query', 'cache:hit', 'cache:miss'];
+            
+            // Generate 100 sample events over the last hour
+            for (let i = 0; i < 100; i++) {
+                const timestamp = now - 3600000 + (i * 36000); // Spread over 1 hour
+                const isError = Math.random() < 0.1; // 10% error rate
+                
+                const event = {
+                    eventId: Math.random().toString(36).substr(2, 9),
+                    timestamp,
+                    serviceId: services[Math.floor(Math.random() * services.length)],
+                    serviceName: services[Math.floor(Math.random() * services.length)],
+                    eventType: isError ? 'error' : eventTypes[Math.floor(Math.random() * eventTypes.length)],
+                    data: isError ? { error: 'Sample error', message: 'Something went wrong' } : {}
+                };
+                
+                handleRealtimeEvent(event);
+            }
+        }
+
+        // Initialize dashboard
+        function init() {
+            initTimeline();
+            connectWebSocket();
+            
+            // Generate sample data for demo
+            setTimeout(() => {
+                if (dashboardState.events.length === 0) {
+                    console.log('Generating sample data for demo...');
+                    generateSampleData();
+                }
+            }, 2000);
+            
+            // Update dashboard every second
+            setInterval(updateDashboard, 1000);
+        }
+
+        // Start when page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

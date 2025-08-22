@@ -1,19 +1,50 @@
-# Traversion: Time Machine for Vibe Coders
+# Traversion: Production Time Machine for Debugging
 
-> Traverse through your code versions without the friction of git
+> From local code versioning to production debugging platform - traverse through time to fix any issue
 
-## 🎯 The Vision
+## 🎯 The Evolution
 
-Traversion is a production debugging platform that lets developers traverse through time to understand, debug, and fix issues by rewinding their entire system state to any point in history.
+**Started as:** A time machine for "vibe coders" - automatic code versioning with zero friction
 
-When production breaks, instead of piecing together logs and metrics, you simply open Traversion and drag a timeline slider backwards to watch your system rewind like a video. See requests flow in reverse, watch errors disappear, and pinpoint the exact moment things went wrong.
+**Became:** A complete production debugging platform that lets you rewind production to any point in time
 
-## 🚀 The Hook
+Traversion now offers two powerful modes:
+1. **Local Development** - Automatic code versioning, timeline navigation, vibe search
+2. **Production Debugging** - Time travel through production, root cause analysis, predictive analytics
+
+## 🚀 Quick Start
+
+### Local Development Mode
+```bash
+# Install dependencies
+npm install
+
+# Start Traversion for code versioning
+npm run dev
+
+# Open UI at http://localhost:3333
+```
+
+### Production Debugging Mode
+```bash
+# Run the production demo with dashboard
+npm run demo:production
+# Dashboard opens automatically at http://localhost:3335/dashboard
+
+# Or run the causality engine demo
+npm run test:causality
+```
+
+## 💡 The Hook
 
 **"Your app crashed at 3:47 AM? Let's go to 3:46 AM and watch it happen."**
 
-## 💡 Core Concept
+## 💡 What Traversion Does
 
+### In Development
+Traversion automatically captures every save, tags your code with vibes, and lets you travel through your coding journey.
+
+### In Production
 Traversion records EVERYTHING in your production environment:
 - Every API request and response
 - Every database change
@@ -26,6 +57,15 @@ Traversion records EVERYTHING in your production environment:
 Then uses AI to understand causality chains - not just "what changed" but "what caused what" - giving you superhuman debugging abilities.
 
 ## ⚡ Key Features
+
+### Development Features
+- **Automatic Version Capture** - Every save is a version
+- **Vibe Search** - Find code by feel: "when it was fast"
+- **Smart Tagging** - 100+ patterns detected automatically
+- **VS Code Extension** - Time travel in your editor
+- **CLI Tool** - Remote access from anywhere
+
+### Production Features
 
 ### Time Travel Slider
 - Drag to rewind/fast-forward through production time

@@ -18,7 +18,9 @@
     "logs": "tail -f .traversion/logs/watcher.log",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
-    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest--coverage",
+    "test:causality": "node test-causality.js",
+    "demo:production": "node demo-production.js",
     "health": "curl -f http://localhost:3333/api/timeline || echo 'Traversion not running'"
   },
   "keywords": [
@@ -38,7 +40,9 @@
     "diff": "^5.1.0",
     "express": "^4.18.2",
     "node-fetch": "^3.3.2",
+    "open": "^10.0.0",
     "ora": "^7.0.1",
+    "uuid": "^9.0.1",
     "ws": "^8.14.2"
   },
   "devDependencies": {
