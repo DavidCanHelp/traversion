@@ -6,6 +6,7 @@
  */
 
 import { IncidentAnalyzer } from '../forensics/incidentAnalyzer.js';
+import { logger } from '../utils/logger.js';
 import { SecureGitIntegration } from '../security/secureGitIntegration.js';
 import express from 'express';
 import logger from '../utils/logger.js';
@@ -59,7 +60,7 @@ export class LightweightMode {
     });
 
     this.app.listen(port);
-    console.log(`🚀 Super simple mode at http://localhost:${port}`);
+    logger.info(`🚀 Super simple mode at http://localhost:${port}`);
   }
 
   renderSimplePage() {
@@ -196,28 +197,28 @@ export class CLIOnlyMode {
     
     switch(command) {
       case 'quick':
-        console.log('🔍 Analyzing last hour of changes...\n');
+        logger.info('🔍 Analyzing last hour of changes...\n');
         const recentAnalysis = await analyzer.analyzeIncident(new Date(), 1, []);
-        console.log(`Risk Level: ${this.getRiskEmoji(recentAnalysis.riskScore)}`);
-        console.log(`Suspicious: ${recentAnalysis.suspiciousCommits.length} commits`);
+        logger.info(`Risk Level: ${this.getRiskEmoji(recentAnalysis.riskScore)}`);
+        logger.info(`Suspicious: ${recentAnalysis.suspiciousCommits.length} commits`);
         if (recentAnalysis.suspiciousCommits[0]) {
-          console.log(`Check: ${recentAnalysis.suspiciousCommits[0].message}`);
+          logger.info(`Check: ${recentAnalysis.suspiciousCommits[0].message}`);
         }
         break;
         
       case 'blame':
-        console.log('🎯 Finding risky commits...\n');
+        logger.info('🎯 Finding risky commits...\n');
         const blameAnalysis = await analyzer.analyzeIncident(new Date(), 24, []);
         blameAnalysis.suspiciousCommits.slice(0, 3).forEach(commit => {
-          console.log(`${this.getRiskEmoji(commit.riskScore)} ${commit.hash.substring(0, 8)} - ${commit.message}`);
+          logger.info(`${this.getRiskEmoji(commit.riskScore)} ${commit.hash.substring(0, 8)} - ${commit.message}`);
         });
         break;
         
       case 'why':
-        console.log('💭 Analyzing why things might be broken...\n');
+        logger.info('💭 Analyzing why things might be broken...\n');
         const reasons = await this.explainPossibleCauses();
         reasons.forEach((reason, i) => {
-          console.log(`${i + 1}. ${reason}`);
+          logger.info(`${i + 1}. ${reason}`);
         });
         break;
     }

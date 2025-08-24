@@ -1,7 +1,7 @@
 import { WebSocketServer } from 'ws';
+import { logger } from '../utils/logger.js';
 import { EventEmitter } from 'events';
 import crypto from 'crypto';
-import logger from '../utils/logger.js';
 
 export class WebRTCSignalingServer extends EventEmitter {
   constructor(port = 3335) {
@@ -61,7 +61,7 @@ export class WebRTCSignalingServer extends EventEmitter {
     });
     
     logger.info('WebRTC signaling server started', { port: this.port });
-    console.log(`🎥 WebRTC signaling server running on port ${this.port}`);
+    logger.info(`🎥 WebRTC signaling server running on port ${this.port}`);
   }
   
   handleMessage(peerId, message) {

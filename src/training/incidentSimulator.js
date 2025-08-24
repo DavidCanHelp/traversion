@@ -1,4 +1,5 @@
 import { simpleGit } from 'simple-git';
+import { logger } from '../utils/logger.js';
 import { IncidentAnalyzer } from '../forensics/incidentAnalyzer.js';
 import { PatternLearner } from '../learning/patternLearner.js';
 import { writeFileSync, readFileSync, existsSync } from 'fs';
@@ -158,10 +159,10 @@ export class IncidentSimulator {
       throw new Error(`Scenario '${scenarioId}' not found`);
     }
 
-    console.log(`🎓 Starting training session: ${scenario.name}`);
-    console.log(`📖 Scenario: ${scenario.description}`);
-    console.log(`⚡ Severity: ${scenario.severity.toUpperCase()}`);
-    console.log(`⏱️ Expected duration: ${scenario.duration} minutes\n`);
+    logger.info(`🎓 Starting training session: ${scenario.name}`);
+    logger.info(`📖 Scenario: ${scenario.description}`);
+    logger.info(`⚡ Severity: ${scenario.severity.toUpperCase()}`);
+    logger.info(`⏱️ Expected duration: ${scenario.duration} minutes\n`);
 
     const session = {
       id: `training-${Date.now()}`,
@@ -199,7 +200,7 @@ export class IncidentSimulator {
   }
 
   async createSimulatedIncident(scenario) {
-    console.log('🔍 Creating simulated incident based on scenario...\n');
+    logger.info('🔍 Creating simulated incident based on scenario...\n');
 
     // Look for historical commits that match the scenario patterns
     const endTime = new Date();
@@ -221,7 +222,7 @@ export class IncidentSimulator {
         return await this.enhanceCommitForScenario(baseCommit, scenario);
       }
     } catch (error) {
-      console.log('⚠️ Could not find matching historical commits, creating synthetic scenario');
+      logger.info('⚠️ Could not find matching historical commits, creating synthetic scenario');
     }
 
     // Create a synthetic incident
@@ -325,7 +326,7 @@ export class IncidentSimulator {
   }
 
   async runGuidedSession(session, incident) {
-    console.log('📚 GUIDED MODE: I\'ll walk you through the analysis step by step\n');
+    logger.info('📚 GUIDED MODE: I\'ll walk you through the analysis step by step\n');
 
     // Step 1: Initial assessment
     await this.guidedStep(session, 'initial-assessment', 
@@ -359,8 +360,8 @@ export class IncidentSimulator {
   }
 
   async runChallengeSession(session, incident) {
-    console.log('🏆 CHALLENGE MODE: Analyze this incident as quickly as possible!\n');
-    console.log('⏱️ Timer started - try to identify the root cause and key risk factors.\n');
+    logger.info('🏆 CHALLENGE MODE: Analyze this incident as quickly as possible!\n');
+    logger.info('⏱️ Timer started - try to identify the root cause and key risk factors.\n');
 
     const startTime = Date.now();
 
@@ -398,7 +399,7 @@ export class IncidentSimulator {
   }
 
   async runAssessmentSession(session, incident) {
-    console.log('📊 ASSESSMENT MODE: Complete forensic analysis for evaluation\n');
+    logger.info('📊 ASSESSMENT MODE: Complete forensic analysis for evaluation\n');
 
     // Multi-part assessment
     const assessmentParts = [
@@ -437,7 +438,7 @@ export class IncidentSimulator {
     session.results = { parts: {}, totalScore: 0 };
 
     for (const part of assessmentParts) {
-      console.log(`\n📋 ${part.title}: ${part.task}`);
+      logger.info(`\n📋 ${part.title}: ${part.task}`);
       const response = await this.promptForAssessmentResponse(part, incident);
       const score = await this.scoreAssessmentResponse(part, response, incident);
       
@@ -457,7 +458,7 @@ export class IncidentSimulator {
   }
 
   async guidedStep(session, stepId, instruction, displayFunction) {
-    console.log(`\n🎯 STEP: ${instruction}\n`);
+    logger.info(`\n🎯 STEP: ${instruction}\n`);
     
     if (displayFunction) {
       displayFunction();
@@ -472,61 +473,61 @@ export class IncidentSimulator {
       userResponse: response
     });
 
-    console.log('\n' + '─'.repeat(60) + '\n');
+    logger.info('\n' + '─'.repeat(60) + '\n');
   }
 
   displayIncidentOverview(incident) {
-    console.log('📊 INCIDENT OVERVIEW:');
-    console.log(`   Time: ${new Date(incident.timestamp).toLocaleString()}`);
-    console.log(`   Severity: ${incident.severity.toUpperCase()}`);
-    console.log(`   Duration: ~${incident.duration} minutes`);
-    console.log(`   Affected Files: ${incident.affectedFiles.length}`);
-    console.log(`   Suspicious Commits: ${incident.suspiciousCommits.length}`);
+    logger.info('📊 INCIDENT OVERVIEW:');
+    logger.info(`   Time: ${new Date(incident.timestamp).toLocaleString()}`);
+    logger.info(`   Severity: ${incident.severity.toUpperCase()}`);
+    logger.info(`   Duration: ~${incident.duration} minutes`);
+    logger.info(`   Affected Files: ${incident.affectedFiles.length}`);
+    logger.info(`   Suspicious Commits: ${incident.suspiciousCommits.length}`);
     if (incident.description) {
-      console.log(`   Description: ${incident.description}`);
+      logger.info(`   Description: ${incident.description}`);
     }
   }
 
   displayCommitAnalysis(commits) {
-    console.log('🔍 SUSPICIOUS COMMITS:');
+    logger.info('🔍 SUSPICIOUS COMMITS:');
     commits.forEach((commit, index) => {
       const riskEmoji = commit.riskScore > 0.7 ? '🚨' : commit.riskScore > 0.4 ? '⚠️' : '🟡';
-      console.log(`\n${index + 1}. ${riskEmoji} ${commit.shortHash} - ${commit.message}`);
-      console.log(`   Author: ${commit.author} | Risk: ${(commit.riskScore * 100).toFixed(0)}%`);
-      console.log(`   Files: ${commit.filesChanged?.length || 0} | Changes: +${commit.linesChanged?.additions || 0}/-${commit.linesChanged?.deletions || 0}`);
+      logger.info(`\n${index + 1}. ${riskEmoji} ${commit.shortHash} - ${commit.message}`);
+      logger.info(`   Author: ${commit.author} | Risk: ${(commit.riskScore * 100).toFixed(0)}%`);
+      logger.info(`   Files: ${commit.filesChanged?.length || 0} | Changes: +${commit.linesChanged?.additions || 0}/-${commit.linesChanged?.deletions || 0}`);
       if (commit.riskFactors && commit.riskFactors.length > 0) {
-        console.log(`   Risk Factors: ${commit.riskFactors.join(', ')}`);
+        logger.info(`   Risk Factors: ${commit.riskFactors.join(', ')}`);
       }
     });
   }
 
   compareRiskFactors(actual, expected) {
-    console.log('📋 RISK FACTOR COMPARISON:');
-    console.log('\nExpected patterns for this scenario:');
-    expected.forEach(pattern => console.log(`   ✓ ${pattern}`));
+    logger.info('📋 RISK FACTOR COMPARISON:');
+    logger.info('\nExpected patterns for this scenario:');
+    expected.forEach(pattern => logger.info(`   ✓ ${pattern}`));
     
-    console.log('\nActual patterns found:');
+    logger.info('\nActual patterns found:');
     actual.forEach(pattern => {
       const isExpected = expected.includes(pattern);
-      console.log(`   ${isExpected ? '✅' : '❓'} ${pattern}`);
+      logger.info(`   ${isExpected ? '✅' : '❓'} ${pattern}`);
     });
 
     const missed = expected.filter(p => !actual.includes(p));
     if (missed.length > 0) {
-      console.log('\nMissed patterns:');
-      missed.forEach(pattern => console.log(`   ❌ ${pattern}`));
+      logger.info('\nMissed patterns:');
+      missed.forEach(pattern => logger.info(`   ❌ ${pattern}`));
     }
   }
 
   displayRootCauseGuidance(incident) {
     const scenario = this.scenarios.find(s => s.id === incident.scenario);
     if (scenario) {
-      console.log('💡 ROOT CAUSE GUIDANCE:');
-      console.log(`\nScenario: ${scenario.name}`);
-      console.log(`Typical causes: ${scenario.triggers.join(', ')}`);
-      console.log('\nLook for:');
+      logger.info('💡 ROOT CAUSE GUIDANCE:');
+      logger.info(`\nScenario: ${scenario.name}`);
+      logger.info(`Typical causes: ${scenario.triggers.join(', ')}`);
+      logger.info('\nLook for:');
       scenario.commonPatterns.forEach(pattern => {
-        console.log(`   • ${pattern}`);
+        logger.info(`   • ${pattern}`);
       });
     }
   }
@@ -566,29 +567,29 @@ export class IncidentSimulator {
       'Create incident response procedures'
     ];
 
-    console.log('🛡️ PREVENTION RECOMMENDATIONS:');
-    strategies.forEach(strategy => console.log(`   • ${strategy}`));
+    logger.info('🛡️ PREVENTION RECOMMENDATIONS:');
+    strategies.forEach(strategy => logger.info(`   • ${strategy}`));
   }
 
   async waitForUserInput(prompt) {
     // In a real implementation, this would use readline or similar
     // For now, simulate user interaction
-    console.log(prompt);
+    logger.info(prompt);
     return 'user_acknowledged';
   }
 
   async promptForRiskFactors() {
-    console.log('\n🎯 CHALLENGE: Identify the top 3 risk factors for this incident');
-    console.log('Common risk factors: Configuration changes, Off-hours deployment, Database changes, Security changes, Large code changes, Vague commit message');
+    logger.info('\n🎯 CHALLENGE: Identify the top 3 risk factors for this incident');
+    logger.info('Common risk factors: Configuration changes, Off-hours deployment, Database changes, Security changes, Large code changes, Vague commit message');
     
     // Simulate user input - in real implementation would prompt user
     return ['Configuration changes', 'Off-hours deployment', 'Urgent/fix commit'];
   }
 
   async promptForCulpritCommit(commits) {
-    console.log('\n🎯 CHALLENGE: Which commit is most likely the culprit?');
+    logger.info('\n🎯 CHALLENGE: Which commit is most likely the culprit?');
     commits.forEach((commit, index) => {
-      console.log(`${index + 1}. ${commit.shortHash} - ${commit.message} (${(commit.riskScore * 100).toFixed(0)}% risk)`);
+      logger.info(`${index + 1}. ${commit.shortHash} - ${commit.message} (${(commit.riskScore * 100).toFixed(0)}% risk)`);
     });
     
     // Simulate user selection
@@ -596,7 +597,7 @@ export class IncidentSimulator {
   }
 
   async promptForPrevention() {
-    console.log('\n🎯 CHALLENGE: What prevention measures would you implement?');
+    logger.info('\n🎯 CHALLENGE: What prevention measures would you implement?');
     
     // Simulate user response
     return [
@@ -632,60 +633,60 @@ export class IncidentSimulator {
   }
 
   displayChallengeResults(session) {
-    console.log('\n🏆 CHALLENGE RESULTS:');
-    console.log(`⏱️ Duration: ${session.results.duration.toFixed(1)} seconds`);
-    console.log(`📊 Risk Factor Identification: ${(session.results.riskFactorScore * 100).toFixed(0)}%`);
-    console.log(`🎯 Culprit Identification: ${(session.results.culpritScore * 100).toFixed(0)}%`);
-    console.log(`🛡️ Prevention Strategy: ${(session.results.preventionScore * 100).toFixed(0)}%`);
-    console.log(`🏅 Total Score: ${(session.results.totalScore * 100).toFixed(0)}%`);
+    logger.info('\n🏆 CHALLENGE RESULTS:');
+    logger.info(`⏱️ Duration: ${session.results.duration.toFixed(1)} seconds`);
+    logger.info(`📊 Risk Factor Identification: ${(session.results.riskFactorScore * 100).toFixed(0)}%`);
+    logger.info(`🎯 Culprit Identification: ${(session.results.culpritScore * 100).toFixed(0)}%`);
+    logger.info(`🛡️ Prevention Strategy: ${(session.results.preventionScore * 100).toFixed(0)}%`);
+    logger.info(`🏅 Total Score: ${(session.results.totalScore * 100).toFixed(0)}%`);
 
     const grade = session.results.totalScore >= 0.9 ? 'A' :
                   session.results.totalScore >= 0.8 ? 'B' :
                   session.results.totalScore >= 0.7 ? 'C' :
                   session.results.totalScore >= 0.6 ? 'D' : 'F';
 
-    console.log(`📈 Grade: ${grade}`);
+    logger.info(`📈 Grade: ${grade}`);
   }
 
   displayAssessmentResults(session) {
-    console.log('\n📊 ASSESSMENT RESULTS:');
+    logger.info('\n📊 ASSESSMENT RESULTS:');
     
     Object.entries(session.results.parts).forEach(([partId, result]) => {
-      console.log(`${partId}: ${(result.score * 100).toFixed(0)}% (weight: ${(result.weight * 100)}%)`);
+      logger.info(`${partId}: ${(result.score * 100).toFixed(0)}% (weight: ${(result.weight * 100)}%)`);
     });
 
-    console.log(`\n🏅 Final Score: ${(session.results.totalScore * 100).toFixed(0)}%`);
+    logger.info(`\n🏅 Final Score: ${(session.results.totalScore * 100).toFixed(0)}%`);
     
     const grade = session.results.totalScore >= 0.9 ? 'Excellent' :
                   session.results.totalScore >= 0.8 ? 'Good' :
                   session.results.totalScore >= 0.7 ? 'Satisfactory' :
                   session.results.totalScore >= 0.6 ? 'Needs Improvement' : 'Poor';
 
-    console.log(`📈 Assessment: ${grade}`);
+    logger.info(`📈 Assessment: ${grade}`);
   }
 
   displaySessionSummary(session) {
-    console.log('\n' + '═'.repeat(60));
-    console.log('📚 TRAINING SESSION COMPLETE');
-    console.log('═'.repeat(60));
-    console.log(`Scenario: ${session.scenario.name}`);
-    console.log(`Mode: ${session.mode.toUpperCase()}`);
-    console.log(`Duration: ${Math.round((session.endTime - session.startTime) / 1000 / 60)} minutes`);
+    logger.info('\n' + '═'.repeat(60));
+    logger.info('📚 TRAINING SESSION COMPLETE');
+    logger.info('═'.repeat(60));
+    logger.info(`Scenario: ${session.scenario.name}`);
+    logger.info(`Mode: ${session.mode.toUpperCase()}`);
+    logger.info(`Duration: ${Math.round((session.endTime - session.startTime) / 1000 / 60)} minutes`);
     
     if (session.results.totalScore !== undefined) {
-      console.log(`Score: ${(session.results.totalScore * 100).toFixed(0)}%`);
+      logger.info(`Score: ${(session.results.totalScore * 100).toFixed(0)}%`);
     }
 
-    console.log('\n🎯 Learning Goals Covered:');
+    logger.info('\n🎯 Learning Goals Covered:');
     session.scenario.learningGoals.forEach(goal => {
-      console.log(`   ✓ ${goal}`);
+      logger.info(`   ✓ ${goal}`);
     });
 
-    console.log('\n💡 Next Steps:');
-    console.log('   • Review the scenario patterns in real incidents');
-    console.log('   • Practice with different scenario types');
-    console.log('   • Share insights with your team');
-    console.log('   • Apply learnings to your incident response process');
+    logger.info('\n💡 Next Steps:');
+    logger.info('   • Review the scenario patterns in real incidents');
+    logger.info('   • Practice with different scenario types');
+    logger.info('   • Share insights with your team');
+    logger.info('   • Apply learnings to your incident response process');
   }
 
   async saveTrainingResults(session) {
@@ -696,7 +697,7 @@ export class IncidentSimulator {
       try {
         results = JSON.parse(readFileSync(resultsPath, 'utf8'));
       } catch (error) {
-        console.warn('Could not read existing training results');
+        logger.warn('Could not read existing training results');
       }
     }
 
@@ -720,7 +721,7 @@ export class IncidentSimulator {
     try {
       writeFileSync(resultsPath, JSON.stringify(results, null, 2));
     } catch (error) {
-      console.warn('Could not save training results:', error.message);
+      logger.warn('Could not save training results:', error.message);
     }
   }
 
@@ -771,7 +772,7 @@ export class IncidentSimulator {
         recentSessions: results.slice(-10)
       };
     } catch (error) {
-      console.warn('Could not read training statistics:', error.message);
+      logger.warn('Could not read training statistics:', error.message);
       return { totalSessions: 0, averageScore: 0, scenarioStats: {} };
     }
   }

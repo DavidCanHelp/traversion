@@ -6,6 +6,7 @@
  */
 
 import { MonitoringIntegrations } from '../integrations/monitoringIntegrations.js';
+import { logger } from '../utils/logger.js';
 import { IncidentAnalyzer } from '../forensics/incidentAnalyzer.js';
 import { PostMortemGenerator } from '../postmortem/postMortemGenerator.js';
 import logger from '../utils/logger.js';
@@ -203,7 +204,7 @@ export class InstantValueDemo {
   static async runDemo(repoUrl, incidentDescription) {
     const analyzer = new IncidentAnalyzer();
     
-    console.log('⏱️ 60-Second Value Demo Starting...\n');
+    logger.info('⏱️ 60-Second Value Demo Starting...\n');
     
     // Analyze last 24 hours of commits
     const analysis = await analyzer.analyzeIncident(

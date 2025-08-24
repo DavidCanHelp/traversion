@@ -6,6 +6,7 @@
  */
 
 import jwt from 'jsonwebtoken';
+import { logger } from '../utils/logger.js';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
@@ -78,9 +79,9 @@ class AuthService extends EventEmitter {
     try {
       await this.createAuthTables();
       await this.createDefaultSuperAdmin();
-      console.log('✓ Authentication service initialized');
+      logger.info('✓ Authentication service initialized');
     } catch (error) {
-      console.error('Failed to initialize auth service:', error);
+      logger.error('Failed to initialize auth service:', error);
       throw error;
     }
   }
@@ -203,9 +204,9 @@ class AuthService extends EventEmitter {
       emailVerified: true
     });
     
-    console.log(`✓ Created super admin: ${adminEmail}`);
-    console.log(`  Default password: ${adminPassword}`);
-    console.log('  ⚠️  Please change the default password!');
+    logger.info(`✓ Created super admin: ${adminEmail}`);
+    logger.info(`  Default password: ${adminPassword}`);
+    logger.info('  ⚠️  Please change the default password!');
   }
 
   /**
@@ -345,7 +346,7 @@ class AuthService extends EventEmitter {
         permissions: this.getUserPermissions(user)
       };
     } catch (error) {
-      console.error('Authentication failed:', error);
+      logger.error('Authentication failed:', error);
       throw error;
     }
   }
@@ -534,7 +535,7 @@ class AuthService extends EventEmitter {
         
         next();
       } catch (error) {
-        console.error('Auth middleware error:', error);
+        logger.error('Auth middleware error:', error);
         return res.status(401).json({ error: error.message });
       }
     };

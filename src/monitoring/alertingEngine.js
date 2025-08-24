@@ -6,6 +6,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { logger } from '../utils/logger.js';
 import nodemailer from 'nodemailer';
 
 class AlertingEngine extends EventEmitter {
@@ -265,7 +266,7 @@ class AlertingEngine extends EventEmitter {
       try {
         await this._checkRule(rule);
       } catch (error) {
-        console.error(`Error checking rule ${ruleName}:`, error);
+        logger.error(`Error checking rule ${ruleName}:`, error);
         this.emit('rule:error', { rule, error });
       }
     }
@@ -365,7 +366,7 @@ class AlertingEngine extends EventEmitter {
         alert.timestamp
       ]);
     } catch (error) {
-      console.error('Failed to store alert:', error);
+      logger.error('Failed to store alert:', error);
     }
   }
   
@@ -378,7 +379,7 @@ class AlertingEngine extends EventEmitter {
         WHERE id = $2
       `, [alert.resolvedAt, alert.id]);
     } catch (error) {
-      console.error('Failed to update alert:', error);
+      logger.error('Failed to update alert:', error);
     }
   }
   
@@ -390,7 +391,7 @@ class AlertingEngine extends EventEmitter {
         try {
           await channel.send(alert, 'triggered');
         } catch (error) {
-          console.error(`Failed to send ${channelType} notification:`, error);
+          logger.error(`Failed to send ${channelType} notification:`, error);
         }
       }
     });
@@ -406,7 +407,7 @@ class AlertingEngine extends EventEmitter {
         try {
           await channel.send(alert, 'resolved');
         } catch (error) {
-          console.error(`Failed to send ${channelType} resolution notification:`, error);
+          logger.error(`Failed to send ${channelType} resolution notification:`, error);
         }
       }
     });
@@ -507,13 +508,13 @@ class AlertingEngine extends EventEmitter {
     const timestamp = new Date().toISOString();
     const status = type === 'resolved' ? 'RESOLVED' : 'TRIGGERED';
     
-    console.log(`[${timestamp}] ALERT ${status}: [${alert.severity.toUpperCase()}] ${alert.title}`);
-    console.log(`  Rule: ${alert.ruleName}`);
-    console.log(`  Description: ${alert.description}`);
+    logger.info(`[${timestamp}] ALERT ${status}: [${alert.severity.toUpperCase()}] ${alert.title}`);
+    logger.info(`  Rule: ${alert.ruleName}`);
+    logger.info(`  Description: ${alert.description}`);
     if (Object.keys(alert.data).length > 0) {
-      console.log(`  Data:`, JSON.stringify(alert.data, null, 2));
+      logger.info(`  Data:`, JSON.stringify(alert.data, null, 2));
     }
-    console.log('');
+    logger.info('');
   }
   
   // Format alert description with data

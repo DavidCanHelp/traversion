@@ -1,4 +1,5 @@
 import { WebClient, LogLevel } from '@slack/web-api';
+import { logger } from '../utils/logger.js';
 import { createEventAdapter } from '@slack/events-api';
 import { createServer } from 'http';
 import { IncidentAnalyzer } from '../forensics/incidentAnalyzer.js';
@@ -533,16 +534,16 @@ export class SlackBot {
     const server = createServer(this.events.requestListener());
     
     server.listen(this.port, () => {
-      console.log(`🤖 Traversion Slack bot listening on port ${this.port}`);
-      console.log('📱 Ready to help with incident response!');
+      logger.info(`🤖 Traversion Slack bot listening on port ${this.port}`);
+      logger.info('📱 Ready to help with incident response!');
     });
 
     // Test the connection
     try {
       const auth = await this.client.auth.test();
-      console.log(`✅ Connected to Slack as ${auth.user} in team ${auth.team}`);
+      logger.info(`✅ Connected to Slack as ${auth.user} in team ${auth.team}`);
     } catch (error) {
-      console.error('❌ Failed to connect to Slack:', error);
+      logger.error('❌ Failed to connect to Slack:', error);
     }
 
     return server;
@@ -640,7 +641,7 @@ export class SlackBot {
 
       return { channelId, channelName };
     } catch (error) {
-      console.error('Failed to create incident channel:', error);
+      logger.error('Failed to create incident channel:', error);
       throw error;
     }
   }

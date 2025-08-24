@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { logger } from '../utils/logger.js';
 import path from 'path';
 
 export class PatternLearner {
@@ -18,7 +19,7 @@ export class PatternLearner {
         return JSON.parse(readFileSync(this.dataPath, 'utf8'));
       }
     } catch (error) {
-      console.warn('Failed to load patterns:', error.message);
+      logger.warn('Failed to load patterns:', error.message);
     }
     
     return {
@@ -38,13 +39,13 @@ export class PatternLearner {
       this.patterns.lastUpdated = new Date().toISOString();
       writeFileSync(this.dataPath, JSON.stringify(this.patterns, null, 2));
     } catch (error) {
-      console.error('Failed to save patterns:', error.message);
+      logger.error('Failed to save patterns:', error.message);
     }
   }
 
   // Learn from a completed incident analysis
   async learnFromIncident(incident) {
-    console.log(`🧠 Learning from incident: ${incident.id || 'unknown'}`);
+    logger.info(`🧠 Learning from incident: ${incident.id || 'unknown'}`);
 
     const incidentData = {
       id: incident.id || Date.now().toString(),
@@ -305,7 +306,7 @@ export class PatternLearner {
 
   // Apply learned patterns to enhance risk scoring
   enhanceRiskAssessment(analysis) {
-    console.log('🧠 Applying learned patterns to risk assessment');
+    logger.info('🧠 Applying learned patterns to risk assessment');
 
     if (analysis.suspiciousCommits) {
       for (const commit of analysis.suspiciousCommits) {

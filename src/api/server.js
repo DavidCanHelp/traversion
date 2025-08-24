@@ -6,6 +6,7 @@
  */
 
 import express from 'express';
+import { logger } from '../utils/logger.js';
 import { WebSocketServer } from 'ws';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -158,7 +159,7 @@ app.use((req, res, next) => {
   
   res.on('finish', () => {
     const duration = Date.now() - start;
-    console.log(`${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
+    logger.info(`${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
     
     // Record metrics
     metrics.recordAPIRequest(req.method, req.route?.path || req.path, res.statusCode, duration);
@@ -193,7 +194,7 @@ app.get('/metrics', (req, res) => {
     res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
     res.send(prometheusFormat);
   } catch (error) {
-    console.error('Error exporting metrics:', error);
+    logger.error('Error exporting metrics:', error);
     res.status(500).send('Error exporting metrics');
   }
 });
@@ -211,7 +212,7 @@ app.get('/api/internal/metrics', authenticate, requireRole('admin'), (req, res) 
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error getting internal metrics:', error);
+    logger.error('Error getting internal metrics:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve metrics'
@@ -249,7 +250,7 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -283,7 +284,7 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Registration error:', error);
+    logger.error('Registration error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -307,7 +308,7 @@ app.post('/api/auth/refresh', authenticateJWT, async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Token refresh error:', error);
+    logger.error('Token refresh error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -320,7 +321,7 @@ app.post('/api/auth/logout', authenticateJWT, async (req, res) => {
     await authService.logout(req.user.id, req.sessionId);
     res.json({ success: true });
   } catch (error) {
-    console.error('Logout error:', error);
+    logger.error('Logout error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -334,7 +335,7 @@ app.get('/api/auth/users', authenticate, requireRole('admin'), async (req, res) 
     const users = await authService.getUsers(req.user.tenantId);
     res.json({ success: true, users });
   } catch (error) {
-    console.error('Get users error:', error);
+    logger.error('Get users error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -358,7 +359,7 @@ app.patch('/api/auth/users/:userId', authenticate, requireRole('admin'), async (
       });
     }
   } catch (error) {
-    console.error('Update user error:', error);
+    logger.error('Update user error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -372,7 +373,7 @@ app.get('/api/auth/api-keys', authenticate, requireRole('admin'), async (req, re
     const apiKeys = await authService.getAPIKeys(req.user.tenantId);
     res.json({ success: true, apiKeys });
   } catch (error) {
-    console.error('Get API keys error:', error);
+    logger.error('Get API keys error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -408,7 +409,7 @@ app.post('/api/auth/api-keys', authenticate, requireRole('admin'), async (req, r
       });
     }
   } catch (error) {
-    console.error('Create API key error:', error);
+    logger.error('Create API key error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -431,7 +432,7 @@ app.delete('/api/auth/api-keys/:keyId', authenticate, requireRole('admin'), asyn
       });
     }
   } catch (error) {
-    console.error('Delete API key error:', error);
+    logger.error('Delete API key error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -476,7 +477,7 @@ app.post('/api/export', authenticate, requirePermission('data:export'), async (r
     }
     
   } catch (error) {
-    console.error('Export error:', error);
+    logger.error('Export error:', error);
     res.status(400).json({
       success: false,
       error: error.message
@@ -502,7 +503,7 @@ app.get('/api/export/:exportId/status', authenticate, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Export status error:', error);
+    logger.error('Export status error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -534,7 +535,7 @@ app.get('/api/export/stream', authenticate, requirePermission('data:export'), (r
     exportStream.pipe(res);
     
   } catch (error) {
-    console.error('Export stream error:', error);
+    logger.error('Export stream error:', error);
     res.status(400).json({
       success: false,
       error: error.message
@@ -573,7 +574,7 @@ app.post('/api/backup', authenticate, requireRole('admin'), async (req, res) => 
     });
     
   } catch (error) {
-    console.error('Backup creation error:', error);
+    logger.error('Backup creation error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -593,7 +594,7 @@ app.get('/api/backup', authenticate, requireRole('admin'), async (req, res) => {
     });
     
   } catch (error) {
-    console.error('List backups error:', error);
+    logger.error('List backups error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -619,7 +620,7 @@ app.get('/api/backup/:backupId/status', authenticate, requireRole('admin'), asyn
     });
     
   } catch (error) {
-    console.error('Backup status error:', error);
+    logger.error('Backup status error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -646,7 +647,7 @@ app.post('/api/backup/:backupId/restore', authenticate, requireRole('admin'), as
     });
     
   } catch (error) {
-    console.error('Backup restore error:', error);
+    logger.error('Backup restore error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -667,7 +668,7 @@ app.delete('/api/backup/:backupId', authenticate, requireRole('admin'), async (r
     });
     
   } catch (error) {
-    console.error('Backup deletion error:', error);
+    logger.error('Backup deletion error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -686,7 +687,7 @@ app.get('/api/backup/schedules', authenticate, requireRole('admin'), async (req,
     });
     
   } catch (error) {
-    console.error('Get schedules error:', error);
+    logger.error('Get schedules error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -705,7 +706,7 @@ app.post('/api/backup/schedules', authenticate, requireRole('admin'), async (req
     });
     
   } catch (error) {
-    console.error('Add schedule error:', error);
+    logger.error('Add schedule error:', error);
     res.status(400).json({
       success: false,
       error: error.message
@@ -726,7 +727,7 @@ app.patch('/api/backup/schedules/:name', authenticate, requireRole('admin'), asy
     });
     
   } catch (error) {
-    console.error('Update schedule error:', error);
+    logger.error('Update schedule error:', error);
     res.status(400).json({
       success: false,
       error: error.message
@@ -747,7 +748,7 @@ app.post('/api/backup/schedules/:name/trigger', authenticate, requireRole('admin
     });
     
   } catch (error) {
-    console.error('Trigger schedule error:', error);
+    logger.error('Trigger schedule error:', error);
     res.status(400).json({
       success: false,
       error: error.message
@@ -773,7 +774,7 @@ app.delete('/api/backup/schedules/:name', authenticate, requireRole('admin'), as
     });
     
   } catch (error) {
-    console.error('Remove schedule error:', error);
+    logger.error('Remove schedule error:', error);
     res.status(400).json({
       success: false,
       error: error.message
@@ -806,7 +807,7 @@ app.post('/api/query', authenticate, requirePermission('query:read'), async (req
     );
     res.json({ success: true, result });
   } catch (error) {
-    console.error('Query error:', error);
+    logger.error('Query error:', error);
     res.status(400).json({ 
       success: false, 
       error: error.message 
@@ -830,7 +831,7 @@ app.get('/api/events', authenticate, requirePermission('events:read'), async (re
     const events = await storage.queryTimeRange(startTime, endTime, filters);
     res.json({ success: true, events });
   } catch (error) {
-    console.error('Events query error:', error);
+    logger.error('Events query error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -845,7 +846,7 @@ app.get('/api/state/:timestamp', authenticate, requirePermission('state:read'), 
     const state = await storage.getSystemStateAt(timestamp, req.user.tenantId);
     res.json({ success: true, state });
   } catch (error) {
-    console.error('State query error:', error);
+    logger.error('State query error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -860,7 +861,7 @@ app.get('/api/root-cause/:eventId', authenticate, requirePermission('causality:r
     const chain = await storage.findRootCause(eventId, req.user.tenantId);
     res.json({ success: true, chain });
   } catch (error) {
-    console.error('Root cause error:', error);
+    logger.error('Root cause error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -883,7 +884,7 @@ app.get('/api/causality/:eventId', authenticate, requirePermission('causality:re
     
     res.json({ success: true, chain });
   } catch (error) {
-    console.error('Causality query error:', error);
+    logger.error('Causality query error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -902,7 +903,7 @@ app.get('/api/metrics', authenticate, requirePermission('metrics:read'), async (
     const metrics = await storage.getMetrics(startTime, endTime, name, req.user.tenantId);
     res.json({ success: true, metrics });
   } catch (error) {
-    console.error('Metrics query error:', error);
+    logger.error('Metrics query error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -930,7 +931,7 @@ app.get('/api/stats', authenticate, requirePermission('stats:read'), async (req,
       }
     });
   } catch (error) {
-    console.error('Stats error:', error);
+    logger.error('Stats error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -978,7 +979,7 @@ app.post('/api/events', authenticate, requirePermission('events:write'), async (
       message: `${stored} events stored successfully`
     });
   } catch (error) {
-    console.error('Event ingestion error:', error);
+    logger.error('Event ingestion error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -992,7 +993,7 @@ const wsClients = new Set();
 
 wss.on('connection', (ws) => {
   wsClients.add(ws);
-  console.log('WebSocket client connected. Total clients:', wsClients.size);
+  logger.info('WebSocket client connected. Total clients:', wsClients.size);
   
   // Send connection confirmation
   ws.send(JSON.stringify({ 
@@ -1104,11 +1105,11 @@ wss.on('connection', (ws) => {
   
   ws.on('close', () => {
     wsClients.delete(ws);
-    console.log('WebSocket client disconnected. Total clients:', wsClients.size);
+    logger.info('WebSocket client disconnected. Total clients:', wsClients.size);
   });
   
   ws.on('error', (error) => {
-    console.error('WebSocket error:', error);
+    logger.error('WebSocket error:', error);
     wsClients.delete(ws);
   });
 });
@@ -1167,7 +1168,7 @@ collector.on('event:collected', async (event) => {
     // Broadcast to clients
     broadcastEvents([event]);
   } catch (error) {
-    console.error('Failed to process collected event:', error);
+    logger.error('Failed to process collected event:', error);
   }
 });
 
@@ -1180,7 +1181,7 @@ causalityEngine.on('causality:detected', async ({ cause, effect, confidence, typ
     metrics.recordCausalityDetection(cause.tenantId || 'unknown', type, confidence);
     metrics.setGauge('causality_graph_size', '', [cause.tenantId || 'unknown'], causalityEngine.causalityGraph.size);
   } catch (error) {
-    console.error('Failed to store causality:', error);
+    logger.error('Failed to store causality:', error);
   }
 });
 
@@ -1188,14 +1189,14 @@ causalityEngine.on('pattern:matched', async ({ pattern }) => {
   try {
     await storage.storePattern(pattern);
   } catch (error) {
-    console.error('Failed to store pattern:', error);
+    logger.error('Failed to store pattern:', error);
   }
 });
 
 // Error handling middleware with security sanitization
 app.use(authMiddleware.sanitizeErrors);
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
+  logger.error('Unhandled error:', err);
   res.status(500).json({ 
     success: false, 
     error: 'Internal server error' 
@@ -1212,11 +1213,11 @@ app.use((req, res) => {
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully...');
+  logger.info('SIGTERM received, shutting down gracefully...');
   
   // Close WebSocket server
   wss.close(() => {
-    console.log('WebSocket server closed');
+    logger.info('WebSocket server closed');
   });
   
   // Disconnect from databases
@@ -1242,7 +1243,7 @@ async function start() {
     await storage.connect();
     
     // Initialize authentication service
-    console.log('Initializing authentication service...');
+    logger.info('Initializing authentication service...');
     await authService.initialize();
     
     // Create default admin user if none exists
@@ -1252,7 +1253,7 @@ async function start() {
     );
     
     if (adminExists.rows[0].count === '0') {
-      console.log('Creating default admin user...');
+      logger.info('Creating default admin user...');
       const defaultTenant = await authService.createTenant('Default Organization');
       if (defaultTenant.success) {
         const adminResult = await authService.createUser(
@@ -1264,14 +1265,14 @@ async function start() {
         );
         
         if (adminResult.success) {
-          console.log('✓ Default admin created: admin@traversion.local / admin123');
-          console.log('✓ Change the default password after first login');
+          logger.info('✓ Default admin created: admin@traversion.local / admin123');
+          logger.info('✓ Change the default password after first login');
         }
       }
     }
     
     // Load historical events into causality engine (last hour)
-    console.log('Loading recent events...');
+    logger.info('Loading recent events...');
     const recentEvents = await storage.queryTimeRange(
       Date.now() - 3600000,
       Date.now()
@@ -1281,19 +1282,19 @@ async function start() {
       causalityEngine.processEvent(event);
     }
     
-    console.log(`Loaded ${recentEvents.length} recent events`);
+    logger.info(`Loaded ${recentEvents.length} recent events`);
     
     // Start cleanup timer for rate limiting
     authMiddleware.startCleanupTimer();
     
     // Start API server
     app.listen(PORT, () => {
-      console.log(`✓ API server running on http://localhost:${PORT}`);
-      console.log(`✓ WebSocket server running on ws://localhost:${WS_PORT}`);
-      console.log(`✓ Security middleware enabled with rate limiting and input sanitization`);
+      logger.info(`✓ API server running on http://localhost:${PORT}`);
+      logger.info(`✓ WebSocket server running on ws://localhost:${WS_PORT}`);
+      logger.info(`✓ Security middleware enabled with rate limiting and input sanitization`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.error('Failed to start server:', error);
     process.exit(1);
   }
 }

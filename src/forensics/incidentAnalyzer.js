@@ -1,4 +1,5 @@
 import { simpleGit } from 'simple-git';
+import { logger } from '../utils/logger.js';
 import { readFileSync, existsSync } from 'fs';
 import path from 'path';
 import { diffLines } from 'diff';
@@ -13,8 +14,8 @@ export class IncidentAnalyzer {
     const endTime = new Date(incidentTime);
     const startTime = new Date(endTime.getTime() - (lookbackHours * 60 * 60 * 1000));
     
-    console.log(`🔍 Analyzing incident at ${endTime.toISOString()}`);
-    console.log(`📅 Looking back ${lookbackHours} hours to ${startTime.toISOString()}`);
+    logger.info(`🔍 Analyzing incident at ${endTime.toISOString()}`);
+    logger.info(`📅 Looking back ${lookbackHours} hours to ${startTime.toISOString()}`);
 
     const analysis = {
       incidentTime: endTime,
@@ -26,7 +27,7 @@ export class IncidentAnalyzer {
 
     // Get commits in the timeframe
     const commits = await this.getCommitsInTimeframe(startTime, endTime);
-    console.log(`📝 Found ${commits.length} commits in timeframe`);
+    logger.info(`📝 Found ${commits.length} commits in timeframe`);
 
     // Analyze each commit for risk indicators
     for (const commit of commits) {
@@ -92,7 +93,7 @@ export class IncidentAnalyzer {
       analysis.riskFactors = this.identifyRiskFactors(analysis, affectedFiles);
 
     } catch (error) {
-      console.warn(`Warning: Could not analyze commit ${commit.hash}: ${error.message}`);
+      logger.warn(`Warning: Could not analyze commit ${commit.hash}: ${error.message}`);
     }
 
     return analysis;

@@ -1,4 +1,5 @@
 import { createAppAuth } from '@octokit/auth-app';
+import { logger } from '../utils/logger.js';
 import { Octokit } from '@octokit/rest';
 import { createNodeMiddleware } from '@octokit/webhooks';
 import { readFileSync } from 'fs';
@@ -63,7 +64,7 @@ export class TraversionGitHubApp {
   async handlePROpened(event) {
     const { pull_request: pr, repository, installation } = event.payload;
     
-    console.log(`🔍 Analyzing opened PR #${pr.number} in ${repository.full_name}`);
+    logger.info(`🔍 Analyzing opened PR #${pr.number} in ${repository.full_name}`);
 
     try {
       const octokit = await this.getInstallationOctokit(installation.id);
@@ -92,7 +93,7 @@ export class TraversionGitHubApp {
       }
 
     } catch (error) {
-      console.error(`Error analyzing PR #${pr.number}:`, error);
+      logger.error(`Error analyzing PR #${pr.number}:`, error);
       
       // Post error comment
       const octokit = await this.getInstallationOctokit(installation.id);
@@ -108,7 +109,7 @@ export class TraversionGitHubApp {
   async handlePRSynchronized(event) {
     const { pull_request: pr, repository, installation } = event.payload;
     
-    console.log(`🔄 Re-analyzing updated PR #${pr.number} in ${repository.full_name}`);
+    logger.info(`🔄 Re-analyzing updated PR #${pr.number} in ${repository.full_name}`);
 
     // Re-run analysis for updated PR
     await this.handlePROpened(event);
@@ -117,7 +118,7 @@ export class TraversionGitHubApp {
   async handlePRReadyForReview(event) {
     const { pull_request: pr, repository, installation } = event.payload;
     
-    console.log(`👀 PR #${pr.number} ready for review in ${repository.full_name}`);
+    logger.info(`👀 PR #${pr.number} ready for review in ${repository.full_name}`);
 
     // Run analysis when PR moves from draft to ready
     await this.handlePROpened(event);
@@ -131,13 +132,13 @@ export class TraversionGitHubApp {
     const isIncident = incidentKeywords.test(issue.title) || incidentKeywords.test(issue.body || '');
 
     if (isIncident) {
-      console.log(`🚨 Potential incident issue #${issue.number} in ${repository.full_name}`);
+      logger.info(`🚨 Potential incident issue #${issue.number} in ${repository.full_name}`);
       
       try {
         const octokit = await this.getInstallationOctokit(installation.id);
         await this.handleIncidentIssue(octokit, repository, issue);
       } catch (error) {
-        console.error(`Error handling incident issue #${issue.number}:`, error);
+        logger.error(`Error handling incident issue #${issue.number}:`, error);
       }
     }
   }
@@ -148,13 +149,13 @@ export class TraversionGitHubApp {
     // React to incident labels
     const incidentLabels = ['incident', 'outage', 'critical', 'p0', 'production'];
     if (incidentLabels.includes(label.name.toLowerCase())) {
-      console.log(`🚨 Incident label "${label.name}" added to issue #${issue.number}`);
+      logger.info(`🚨 Incident label "${label.name}" added to issue #${issue.number}`);
       
       try {
         const octokit = await this.getInstallationOctokit(installation.id);
         await this.handleIncidentIssue(octokit, repository, issue);
       } catch (error) {
-        console.error(`Error handling labeled incident issue #${issue.number}:`, error);
+        logger.error(`Error handling labeled incident issue #${issue.number}:`, error);
       }
     }
   }
@@ -168,26 +169,26 @@ export class TraversionGitHubApp {
       return;
     }
 
-    console.log(`📦 Analyzing push to ${ref} in ${repository.full_name} (${commits.length} commits)`);
+    logger.info(`📦 Analyzing push to ${ref} in ${repository.full_name} (${commits.length} commits)`);
 
     try {
       const octokit = await this.getInstallationOctokit(installation.id);
       await this.analyzeDeploymentRisk(octokit, repository, commits);
     } catch (error) {
-      console.error(`Error analyzing deployment risk:`, error);
+      logger.error(`Error analyzing deployment risk:`, error);
     }
   }
 
   async handleReleasePublished(event) {
     const { release, repository, installation } = event.payload;
     
-    console.log(`🎉 Release ${release.tag_name} published in ${repository.full_name}`);
+    logger.info(`🎉 Release ${release.tag_name} published in ${repository.full_name}`);
 
     try {
       const octokit = await this.getInstallationOctokit(installation.id);
       await this.analyzeReleaseRisk(octokit, repository, release);
     } catch (error) {
-      console.error(`Error analyzing release risk:`, error);
+      logger.error(`Error analyzing release risk:`, error);
     }
   }
 
@@ -271,7 +272,7 @@ export class TraversionGitHubApp {
           body: `🔴 **High-risk PR detected** - requesting additional reviewers: ${availableReviewers.map(r => `@${r}`).join(', ')}\n\nRisk factors: ${analysis.impactAssessment.riskAreas.join(', ')}`
         });
       } catch (error) {
-        console.error('Failed to request additional reviewers:', error);
+        logger.error('Failed to request additional reviewers:', error);
       }
     }
   }
@@ -312,8 +313,8 @@ I'll analyze recent commits for potential causes and update this issue with find
       labels: ['traversion:incident']
     });
 
-    // TODO: Trigger background analysis and update issue with results
-    this.scheduleIncidentAnalysis(repository, issue, incidentTime);
+    // Trigger background analysis and update issue with results
+    await this.scheduleIncidentAnalysis(repository, issue, incidentTime);
   }
 
   async analyzeDeploymentRisk(octokit, repository, commits) {
@@ -407,10 +408,10 @@ I'll monitor for any incidents in the next 24 hours and correlate them with this
     setTimeout(async () => {
       try {
         // This would integrate with the IncidentAnalyzer
-        console.log(`Running scheduled analysis for incident issue #${issue.number}`);
-        // TODO: Implement actual analysis and update issue
+        logger.info(`Running scheduled analysis for incident issue #${issue.number}`);
+        // Implement actual analysis and update issue
       } catch (error) {
-        console.error('Scheduled incident analysis failed:', error);
+        logger.error('Scheduled incident analysis failed:', error);
       }
     }, 30000); // Run analysis in 30 seconds
   }
@@ -419,8 +420,8 @@ I'll monitor for any incidents in the next 24 hours and correlate them with this
     const server = createServer(this.webhooks);
     
     server.listen(this.port, () => {
-      console.log(`🤖 Traversion GitHub App listening on port ${this.port}`);
-      console.log('📦 Ready to analyze PRs and incidents automatically!');
+      logger.info(`🤖 Traversion GitHub App listening on port ${this.port}`);
+      logger.info('📦 Ready to analyze PRs and incidents automatically!');
     });
 
     return server;

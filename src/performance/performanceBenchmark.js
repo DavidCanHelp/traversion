@@ -6,6 +6,7 @@
  */
 
 import { performance } from 'perf_hooks';
+import { logger } from '../utils/logger.js';
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
@@ -24,7 +25,7 @@ export class PerformanceBenchmark {
    * Run comprehensive performance benchmarks
    */
   async runBenchmarks() {
-    console.log('🏃 Running performance benchmarks...\n');
+    logger.info('🏃 Running performance benchmarks...\n');
     
     const benchmarks = [
       this.benchmarkGitOperations(),
@@ -368,38 +369,38 @@ export class PerformanceBenchmark {
    * Print formatted report
    */
   printReport(report) {
-    console.log('\n' + '='.repeat(60));
-    console.log('         TRAVERSION PERFORMANCE BENCHMARK REPORT');
-    console.log('='.repeat(60) + '\n');
+    logger.info('\n' + '='.repeat(60));
+    logger.info('         TRAVERSION PERFORMANCE BENCHMARK REPORT');
+    logger.info('='.repeat(60) + '\n');
     
-    console.log('📊 SUMMARY');
-    console.log('-'.repeat(40));
-    console.log(`Verdict: ${report.summary.verdict}`);
-    console.log('\nKey Metrics:');
+    logger.info('📊 SUMMARY');
+    logger.info('-'.repeat(40));
+    logger.info(`Verdict: ${report.summary.verdict}`);
+    logger.info('\nKey Metrics:');
     for (const [key, value] of Object.entries(report.summary.keyMetrics)) {
-      console.log(`  • ${key}: ${value}`);
+      logger.info(`  • ${key}: ${value}`);
     }
     
-    console.log('\n⚡ OPTIMIZATIONS');
-    console.log('-'.repeat(40));
+    logger.info('\n⚡ OPTIMIZATIONS');
+    logger.info('-'.repeat(40));
     report.optimizations.forEach(opt => {
-      console.log(`• ${opt.name}: ${opt.impact}`);
+      logger.info(`• ${opt.name}: ${opt.impact}`);
     });
     
-    console.log('\n🏆 COMPARISON');
-    console.log('-'.repeat(40));
-    console.log('Time Saved Per Incident:');
-    console.log(`  Manual: ${report.comparison.vsNoTool.manualIncidentAnalysis}`);
-    console.log(`  Traversion: ${report.comparison.vsNoTool.withTraversion}`);
-    console.log(`  Net Saving: ${report.comparison.vsNoTool.netSaving}`);
+    logger.info('\n🏆 COMPARISON');
+    logger.info('-'.repeat(40));
+    logger.info('Time Saved Per Incident:');
+    logger.info(`  Manual: ${report.comparison.vsNoTool.manualIncidentAnalysis}`);
+    logger.info(`  Traversion: ${report.comparison.vsNoTool.withTraversion}`);
+    logger.info(`  Net Saving: ${report.comparison.vsNoTool.netSaving}`);
     
-    console.log('\n💡 RECOMMENDATIONS');
-    console.log('-'.repeat(40));
+    logger.info('\n💡 RECOMMENDATIONS');
+    logger.info('-'.repeat(40));
     report.recommendations.forEach((rec, i) => {
-      console.log(`${i + 1}. ${rec}`);
+      logger.info(`${i + 1}. ${rec}`);
     });
     
-    console.log('\n' + '='.repeat(60) + '\n');
+    logger.info('\n' + '='.repeat(60) + '\n');
   }
 
   // Simulation helpers
@@ -654,7 +655,7 @@ export class PerformanceOptimizer {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const benchmark = new PerformanceBenchmark();
   benchmark.runBenchmarks().then(report => {
-    console.log('\nBenchmark complete! Full report saved to performance-report.json');
+    logger.info('\nBenchmark complete! Full report saved to performance-report.json');
     fs.writeFile(
       'performance-report.json',
       JSON.stringify(report, null, 2)

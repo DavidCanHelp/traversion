@@ -178,4 +178,4 @@ const logger = new Logger({
 });
 
 export default logger;
-export { Logger };
+export { Logger, logger };

@@ -6,6 +6,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { logger } from '../utils/logger.js';
 import cron from 'node-cron';
 
 class ScheduledBackupService extends EventEmitter {
@@ -289,7 +290,7 @@ class ScheduledBackupService extends EventEmitter {
     
     // Check if already running
     if (this.runningJobs.has(scheduleName)) {
-      console.warn(`Backup job ${scheduleName} is already running, skipping`);
+      logger.warn(`Backup job ${scheduleName} is already running, skipping`);
       return;
     }
     
@@ -441,7 +442,7 @@ class ScheduledBackupService extends EventEmitter {
           });
           
         } catch (error) {
-          console.error(`Failed to copy backup to ${backend}:`, error);
+          logger.error(`Failed to copy backup to ${backend}:`, error);
           
           this.emit('backup:copy_failed', {
             backupId: backupResult.id,
@@ -456,7 +457,7 @@ class ScheduledBackupService extends EventEmitter {
   async _copyBackupToStorage(backupResult, targetBackend) {
     // This would implement copying between storage backends
     // For now, it's a placeholder
-    console.log(`Would copy backup ${backupResult.id} to ${targetBackend}`);
+    logger.info(`Would copy backup ${backupResult.id} to ${targetBackend}`);
   }
   
   _resolveTimeRange(timeRange) {

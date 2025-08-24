@@ -1,4 +1,5 @@
 import express from 'express';
+import { logger } from '../utils/logger.js';
 import { WebSocketServer } from 'ws';
 import { AuthMiddleware } from '../security/authMiddleware.js';
 import { RealTimeDashboard } from '../dashboard/realTimeDashboard.js';
@@ -686,7 +687,7 @@ export class EnterprisePlatform {
       
       const server = this.app.listen(port, () => {
         logger.info('Enterprise Traversion Platform started', { port });
-        console.log(`🚀 Enterprise Platform running at http://localhost:${port}`);
+        logger.info(`🚀 Enterprise Platform running at http://localhost:${port}`);
       });
 
       // Start dashboard

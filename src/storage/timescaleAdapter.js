@@ -6,6 +6,7 @@
  */
 
 import pg from 'pg';
+import { logger } from '../utils/logger.js';
 import Redis from 'ioredis';
 import { EventEmitter } from 'events';
 
@@ -64,18 +65,18 @@ class TimescaleAdapter extends EventEmitter {
       await client.query('SELECT NOW()');
       client.release();
       
-      console.log('✓ Connected to TimescaleDB');
+      logger.info('✓ Connected to TimescaleDB');
       
       // Connect to Redis if caching is enabled
       if (this.cacheEnabled) {
         this.redis = new Redis(this.redisConfig);
         
         this.redis.on('connect', () => {
-          console.log('✓ Connected to Redis');
+          logger.info('✓ Connected to Redis');
         });
         
         this.redis.on('error', (err) => {
-          console.error('Redis error:', err);
+          logger.error('Redis error:', err);
         });
       }
       
@@ -87,7 +88,7 @@ class TimescaleAdapter extends EventEmitter {
       
       return true;
     } catch (error) {
-      console.error('Database connection failed:', error);
+      logger.error('Database connection failed:', error);
       throw error;
     }
   }
@@ -176,7 +177,7 @@ class TimescaleAdapter extends EventEmitter {
       return events.length;
     } catch (error) {
       await client.query('ROLLBACK');
-      console.error('Failed to store events:', error);
+      logger.error('Failed to store events:', error);
       throw error;
     } finally {
       client.release();
@@ -198,7 +199,7 @@ class TimescaleAdapter extends EventEmitter {
     try {
       await this.pool.query(query, [causeEventId, effectEventId, confidence, type]);
     } catch (error) {
-      console.error('Failed to store causality:', error);
+      logger.error('Failed to store causality:', error);
       throw error;
     }
   }
@@ -256,7 +257,7 @@ class TimescaleAdapter extends EventEmitter {
       
       return result.rows;
     } catch (error) {
-      console.error('Query failed:', error);
+      logger.error('Query failed:', error);
       throw error;
     }
   }
@@ -271,7 +272,7 @@ class TimescaleAdapter extends EventEmitter {
       const result = await this.pool.query(query, [new Date(timestamp)]);
       return result.rows;
     } catch (error) {
-      console.error('Failed to get system state:', error);
+      logger.error('Failed to get system state:', error);
       throw error;
     }
   }
@@ -286,7 +287,7 @@ class TimescaleAdapter extends EventEmitter {
       const result = await this.pool.query(query, [errorEventId]);
       return result.rows;
     } catch (error) {
-      console.error('Failed to find root cause:', error);
+      logger.error('Failed to find root cause:', error);
       throw error;
     }
   }
@@ -318,7 +319,7 @@ class TimescaleAdapter extends EventEmitter {
       
       return event;
     } catch (error) {
-      console.error('Failed to get event:', error);
+      logger.error('Failed to get event:', error);
       throw error;
     }
   }
@@ -365,7 +366,7 @@ class TimescaleAdapter extends EventEmitter {
       const result = await this.pool.query(query, [eventId, maxDepth]);
       return result.rows;
     } catch (error) {
-      console.error('Failed to get causality chain:', error);
+      logger.error('Failed to get causality chain:', error);
       throw error;
     }
   }
@@ -394,7 +395,7 @@ class TimescaleAdapter extends EventEmitter {
         1
       ]);
     } catch (error) {
-      console.error('Failed to store pattern:', error);
+      logger.error('Failed to store pattern:', error);
       throw error;
     }
   }
@@ -427,7 +428,7 @@ class TimescaleAdapter extends EventEmitter {
       const result = await this.pool.query(query, params);
       return result.rows;
     } catch (error) {
-      console.error('Failed to get metrics:', error);
+      logger.error('Failed to get metrics:', error);
       throw error;
     }
   }
@@ -484,7 +485,7 @@ class TimescaleAdapter extends EventEmitter {
     } catch (error) {
       // Re-add events to batch on failure
       this.eventBatch.unshift(...events);
-      console.error('Batch flush failed:', error);
+      logger.error('Batch flush failed:', error);
     }
   }
 
@@ -506,7 +507,7 @@ class TimescaleAdapter extends EventEmitter {
       const result = await this.pool.query(query);
       return result.rows[0];
     } catch (error) {
-      console.error('Failed to get stats:', error);
+      logger.error('Failed to get stats:', error);
       throw error;
     }
   }

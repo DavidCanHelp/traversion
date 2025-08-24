@@ -319,3 +319,4 @@ describe('TemporalQueryEngine', () => {
       expect(stats.averageExecutionTime).toBeGreaterThan(0);
     });
   });
+});

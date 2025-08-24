@@ -1,4 +1,5 @@
 import { Octokit } from '@octokit/rest';
+import { logger } from '../utils/logger.js';
 import { readFileSync } from 'fs';
 import path from 'path';
 
@@ -10,7 +11,7 @@ export class GitHubIntegration {
   }
 
   async analyzePullRequest(owner, repo, pullNumber) {
-    console.log(`🔍 Analyzing PR #${pullNumber} in ${owner}/${repo}`);
+    logger.info(`🔍 Analyzing PR #${pullNumber} in ${owner}/${repo}`);
 
     const analysis = {
       pr: null,
@@ -63,10 +64,10 @@ export class GitHubIntegration {
       // Generate review suggestions
       analysis.reviewSuggestions = this.generateReviewSuggestions(fileAnalyses);
 
-      console.log(`✅ Analysis complete. Risk score: ${analysis.riskScore.toFixed(2)}`);
+      logger.info(`✅ Analysis complete. Risk score: ${analysis.riskScore.toFixed(2)}`);
 
     } catch (error) {
-      console.error(`❌ Error analyzing PR: ${error.message}`);
+      logger.error(`❌ Error analyzing PR: ${error.message}`);
       throw error;
     }
 

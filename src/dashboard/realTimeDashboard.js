@@ -1,9 +1,9 @@
 import express from 'express';
+import { logger } from '../utils/logger.js';
 import { WebSocketServer } from 'ws';
 import { IncidentAnalyzer } from '../forensics/incidentAnalyzer.js';
 import { AuthMiddleware } from '../security/authMiddleware.js';
 import { InputSanitizer } from '../security/inputSanitizer.js';
-import logger from '../utils/logger.js';
 
 /**
  * Real-Time Incident Dashboard
@@ -748,7 +748,7 @@ export class RealTimeDashboard {
   start() {
     const server = this.app.listen(this.port, () => {
       logger.info('Real-time dashboard started', { port: this.port });
-      console.log(`🚀 Dashboard running at http://localhost:${this.port}`);
+      logger.info(`🚀 Dashboard running at http://localhost:${this.port}`);
     });
 
     this.setupWebSocket(server);

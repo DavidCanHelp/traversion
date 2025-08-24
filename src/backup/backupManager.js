@@ -7,6 +7,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { logger } from '../utils/logger.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { createWriteStream, createReadStream } from 'fs';
@@ -78,7 +79,7 @@ class BackupManager extends EventEmitter {
           delete: this._deleteFromS3.bind(this)
         });
       } catch (error) {
-        console.warn('S3 backend not available:', error.message);
+        logger.warn('S3 backend not available:', error.message);
       }
     }
     
@@ -98,7 +99,7 @@ class BackupManager extends EventEmitter {
           delete: this._deleteFromGCS.bind(this)
         });
       } catch (error) {
-        console.warn('GCS backend not available:', error.message);
+        logger.warn('GCS backend not available:', error.message);
       }
     }
   }
@@ -470,7 +471,7 @@ class BackupManager extends EventEmitter {
       // Implement Parquet export
       throw new Error('Parquet export not yet implemented');
     } catch (error) {
-      console.warn('Parquet export not available, falling back to JSON');
+      logger.warn('Parquet export not available, falling back to JSON');
       return this._exportJSON(rows, filepath.replace('.parquet', '.json'), metadata);
     }
   }
@@ -763,13 +764,13 @@ class BackupManager extends EventEmitter {
           const backupDate = this._extractBackupDate(backup);
           
           if (backupDate && backupDate < cutoffDate) {
-            console.log(`Cleaning up old backup: ${backup.id} from ${backendName}`);
+            logger.info(`Cleaning up old backup: ${backup.id} from ${backendName}`);
             await backend.delete(backup.id);
             this.emit('backup:cleanup', { id: backup.id, backend: backendName });
           }
         }
       } catch (error) {
-        console.error(`Error cleaning up backups from ${backendName}:`, error);
+        logger.error(`Error cleaning up backups from ${backendName}:`, error);
       }
     }
   }

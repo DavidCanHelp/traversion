@@ -1,4 +1,5 @@
 import express from 'express';
+import { logger } from '../utils/logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { IncidentAnalyzer } from '../forensics/incidentAnalyzer.js';
@@ -455,8 +456,8 @@ export class SimpleWebInterface {
 
   start() {
     this.app.listen(this.port, () => {
-      console.log(`🌐 Traversion web interface running at http://localhost:${this.port}`);
-      console.log('📝 Use this for quick incident analysis and PR reviews');
+      logger.info(`🌐 Traversion web interface running at http://localhost:${this.port}`);
+      logger.info('📝 Use this for quick incident analysis and PR reviews');
     });
   }
 }

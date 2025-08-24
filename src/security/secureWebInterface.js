@@ -1,4 +1,5 @@
 import express from 'express';
+import { logger } from '../utils/logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { IncidentAnalyzer } from '../forensics/incidentAnalyzer.js';
@@ -658,8 +659,8 @@ export class SecureWebInterface {
     this.auth.startCleanupTimer();
     
     this.app.listen(this.port, () => {
-      console.log(`🌐 Secure Traversion web interface running at http://localhost:${this.port}`);
-      console.log('🔒 Security features enabled: XSS protection, input sanitization, rate limiting');
+      logger.info(`🌐 Secure Traversion web interface running at http://localhost:${this.port}`);
+      logger.info('🔒 Security features enabled: XSS protection, input sanitization, rate limiting');
     });
   }
 }

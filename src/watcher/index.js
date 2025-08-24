@@ -49,10 +49,10 @@ class TraversionWatcher {
   }
 
   start() {
-    console.log(chalk.cyan.bold('\n⚡ Traversion - Time Machine for Vibe Coders ⚡\n'));
-    console.log(chalk.gray(`Watching: ${this.watchPath}`));
-    console.log(chalk.gray(`Port: ${this.options.port}`));
-    console.log(chalk.gray(`Extensions: ${this.options.extensions.join(', ')}\n`));
+    logger.info(chalk.cyan.bold('\n⚡ Traversion - Time Machine for Vibe Coders ⚡\n'));
+    logger.info(chalk.gray(`Watching: ${this.watchPath}`));
+    logger.info(chalk.gray(`Port: ${this.options.port}`));
+    logger.info(chalk.gray(`Extensions: ${this.options.extensions.join(', ')}\n`));
 
     logger.info('Starting Traversion', {
       watchPath: this.watchPath,
@@ -65,9 +65,9 @@ class TraversionWatcher {
     this.startWebSocketServer();
     this.startWebRTCServer();
 
-    console.log(chalk.green('✨ Traversion is ready! Your code journey is being recorded...\n'));
-    console.log(chalk.cyan(`🌐 Open http://localhost:${this.options.port} to see your timeline\n`));
-    console.log(chalk.magenta(`🎥 WebRTC collaboration on port ${this.options.port + 2}\n`));
+    logger.info(chalk.green('✨ Traversion is ready! Your code journey is being recorded...\n'));
+    logger.info(chalk.cyan(`🌐 Open http://localhost:${this.options.port} to see your timeline\n`));
+    logger.info(chalk.magenta(`🎥 WebRTC collaboration on port ${this.options.port + 2}\n`));
     
     logger.info('Traversion started successfully');
   }
@@ -89,7 +89,7 @@ class TraversionWatcher {
       .on('unlink', (filePath) => this.handleFileDelete(filePath))
       .on('error', error => {
         logger.error('Watcher error', { error: error.message });
-        console.error(chalk.red('Watcher error:', error));
+        logger.error(chalk.red('Watcher error:', error));
       });
   }
 
@@ -119,7 +119,7 @@ class TraversionWatcher {
       this.recentVersions.unshift(version);
       this.recentVersions = this.recentVersions.slice(0, 50);
 
-      console.log(
+      logger.info(
         chalk.green('📸'),
         chalk.white(relativePath),
         chalk.gray(`[v${versionId}]`),
@@ -138,7 +138,7 @@ class TraversionWatcher {
 
     } catch (error) {
       logger.error(`Error capturing ${relativePath}`, { error: error.message });
-      console.error(chalk.red(`Error capturing ${relativePath}:`, error.message));
+      logger.error(chalk.red(`Error capturing ${relativePath}:`, error.message));
     }
   }
 
@@ -146,14 +146,14 @@ class TraversionWatcher {
     if (!this.shouldTrackFile(filePath)) return;
 
     const relativePath = path.relative(this.watchPath, filePath);
-    console.log(chalk.blue('➕'), chalk.white(relativePath), chalk.gray('[new file]'));
+    logger.info(chalk.blue('➕'), chalk.white(relativePath), chalk.gray('[new file]'));
     
     this.handleFileChange(filePath);
   }
 
   handleFileDelete(filePath) {
     const relativePath = path.relative(this.watchPath, filePath);
-    console.log(chalk.red('🗑️'), chalk.white(relativePath), chalk.gray('[deleted]'));
+    logger.info(chalk.red('🗑️'), chalk.white(relativePath), chalk.gray('[deleted]'));
     
     this.broadcast({
       type: 'delete',
@@ -423,7 +423,7 @@ class TraversionWatcher {
       this.webrtcServer.stop();
     }
     
-    console.log(chalk.yellow('\n👋 Traversion stopped. Your journey is saved!\n'));
+    logger.info(chalk.yellow('\n👋 Traversion stopped. Your journey is saved!\n'));
     logger.info('Traversion stopped successfully');
   }
 }

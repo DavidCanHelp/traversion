@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { logger } from '../utils/logger.js';
 
 export class WebRTCCollaborationClient extends EventEmitter {
   constructor(options = {}) {
@@ -30,7 +31,7 @@ export class WebRTCCollaborationClient extends EventEmitter {
       this.ws = new WebSocket(this.signalingUrl);
       
       this.ws.onopen = () => {
-        console.log('Connected to WebRTC signaling server');
+        logger.info('Connected to WebRTC signaling server');
         this.isConnected = true;
         resolve();
       };
@@ -41,13 +42,13 @@ export class WebRTCCollaborationClient extends EventEmitter {
       };
       
       this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        logger.error('WebSocket error:', error);
         this.emit('error', error);
         reject(error);
       };
       
       this.ws.onclose = () => {
-        console.log('Disconnected from signaling server');
+        logger.info('Disconnected from signaling server');
         this.isConnected = false;
         this.emit('disconnected');
         this.cleanup();
@@ -144,7 +145,7 @@ export class WebRTCCollaborationClient extends EventEmitter {
   }
   
   async handleRoomJoined(message) {
-    console.log(`Joined room ${message.roomId} with ${message.peers.length} peers`);
+    logger.info(`Joined room ${message.roomId} with ${message.peers.length} peers`);
     
     // Store remote peer info
     for (const peer of message.peers) {
@@ -163,7 +164,7 @@ export class WebRTCCollaborationClient extends EventEmitter {
   }
   
   async handlePeerJoined(message) {
-    console.log(`Peer ${message.peer.username} joined`);
+    logger.info(`Peer ${message.peer.username} joined`);
     
     this.remotePeers.set(message.peer.id, message.peer);
     
@@ -174,7 +175,7 @@ export class WebRTCCollaborationClient extends EventEmitter {
   }
   
   handlePeerLeft(message) {
-    console.log(`Peer ${message.peerId} left`);
+    logger.info(`Peer ${message.peerId} left`);
     
     this.closePeerConnection(message.peerId);
     this.remotePeers.delete(message.peerId);
@@ -187,7 +188,7 @@ export class WebRTCCollaborationClient extends EventEmitter {
       return this.peers.get(peerId);
     }
     
-    console.log(`Creating peer connection with ${peerId}`);
+    logger.info(`Creating peer connection with ${peerId}`);
     
     const pc = new RTCPeerConnection({
       iceServers: this.iceServers
@@ -213,7 +214,7 @@ export class WebRTCCollaborationClient extends EventEmitter {
     });
     
     dataChannel.onopen = () => {
-      console.log(`Data channel opened with ${peerId}`);
+      logger.info(`Data channel opened with ${peerId}`);
       this.dataChannels.set(peerId, dataChannel);
       this.emit('peer-connected', { peerId });
     };
@@ -223,7 +224,7 @@ export class WebRTCCollaborationClient extends EventEmitter {
     };
     
     dataChannel.onclose = () => {
-      console.log(`Data channel closed with ${peerId}`);
+      logger.info(`Data channel closed with ${peerId}`);
       this.dataChannels.delete(peerId);
     };
     
@@ -232,7 +233,7 @@ export class WebRTCCollaborationClient extends EventEmitter {
       const channel = event.channel;
       
       channel.onopen = () => {
-        console.log(`Received data channel from ${peerId}`);
+        logger.info(`Received data channel from ${peerId}`);
         this.dataChannels.set(peerId, channel);
       };
       
@@ -340,7 +341,7 @@ export class WebRTCCollaborationClient extends EventEmitter {
           break;
       }
     } catch (error) {
-      console.error('Error handling data channel message:', error);
+      logger.error('Error handling data channel message:', error);
     }
   }
   
@@ -453,7 +454,7 @@ export class WebRTCCollaborationClient extends EventEmitter {
       this.emit('screen-share-started', this.localStream);
       
     } catch (error) {
-      console.error('Error starting screen share:', error);
+      logger.error('Error starting screen share:', error);
       throw error;
     }
   }

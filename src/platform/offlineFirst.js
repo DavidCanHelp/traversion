@@ -6,6 +6,7 @@
  */
 
 import Database from 'better-sqlite3';
+import { logger } from '../utils/logger.js';
 import { EventEmitter } from 'events';
 import fs from 'fs/promises';
 import path from 'path';
@@ -749,7 +750,7 @@ async function syncOfflineQueue() {
       await fetch(item.url, item.options);
       await removeFromQueue(item.id);
     } catch (error) {
-      console.error('Sync failed:', error);
+      logger.error('Sync failed:', error);
     }
   }
 }

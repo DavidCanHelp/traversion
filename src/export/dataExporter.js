@@ -293,7 +293,7 @@ class DataExporter extends EventEmitter {
           }
           callback(error);
         }
-      }.bind(this)
+      }.bind(this),
     });
     
     // Start the stream
