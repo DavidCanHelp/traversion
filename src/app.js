@@ -9,27 +9,78 @@ import path from 'path';
 import auth from './middleware/auth.js';
 import rateLimiter from './middleware/rateLimiter.js';
 import validation from './middleware/validation.js';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yamljs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import logger from './utils/logger.js';
+import config from './config/environment.js';
+import { RiskAnalyzer } from './utils/riskAnalyzer.js';
+import causalityService from './services/causalityService.js';
+import { WebSocketServer } from 'ws';
+import { createServer } from 'http';
 
 /**
- * Minimal working application
- * This is a simplified version to get the app running
+ * Traversion - Open Source Incident Analysis Platform
+ * Real-time post-incident forensics and impact analysis for development teams
  */
 class TraversionApp {
-  constructor(port = 3335) {
-    this.port = port;
+  constructor(port = null) {
+    this.port = port || config.get('app.port');
     this.app = express();
+    this.server = createServer(this.app);
     this.git = simpleGit();
+    this.riskAnalyzer = new RiskAnalyzer();
+    this.wsClients = new Set();
+
     this.setupDataDirectory();
     this.setupDatabase();
+    this.setupSwagger();
     this.setupMiddleware();
+    this.setupWebSocket();
     this.setupRoutes();
+    this.startRealtimeFeatures();
+  }
+
+  setupSwagger() {
+    try {
+      // Get current directory
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+
+      // Load OpenAPI spec
+      const swaggerDocument = YAML.load(path.join(__dirname, '../swagger.yaml'));
+
+      // Configure Swagger UI
+      const options = {
+        customCss: `
+          .swagger-ui .topbar { display: none }
+          .swagger-ui .info .title { color: #2c3e50; }
+          .swagger-ui .info .description { font-size: 16px; }
+        `,
+        customSiteTitle: "Traversion API Documentation",
+        swaggerOptions: {
+          persistAuthorization: true,
+          displayRequestDuration: true,
+          docExpansion: 'list',
+          filter: true
+        }
+      };
+
+      // Serve documentation
+      this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, options));
+
+      logger.info('Swagger documentation initialized');
+    } catch (error) {
+      logger.warn('Swagger setup failed (non-critical)', { error: error.message });
+    }
   }
 
   setupDataDirectory() {
     const dataDir = './.traversion';
     if (!existsSync(dataDir)) {
       mkdirSync(dataDir, { recursive: true });
-      console.log('Created data directory:', dataDir);
+      logger.info(`Created data directory: ${dataDir}`);
     }
   }
 
@@ -70,10 +121,125 @@ class TraversionApp {
         );
       `);
 
-      console.log('Database initialized');
+      logger.info('Database initialized');
     } catch (error) {
-      console.error('Database setup failed:', error);
+      logger.error('Database setup failed', { error: error.message, stack: error.stack });
     }
+  }
+
+  setupWebSocket() {
+    this.wss = new WebSocketServer({
+      server: this.server,
+      path: '/ws'
+    });
+
+    this.wss.on('connection', (ws, req) => {
+      const clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      ws.clientId = clientId;
+      ws.isAlive = true;
+      this.wsClients.add(ws);
+
+      logger.info('WebSocket client connected', {
+        clientId,
+        totalClients: this.wsClients.size,
+        ip: req.socket.remoteAddress
+      });
+
+      // Send welcome message
+      ws.send(JSON.stringify({
+        type: 'connected',
+        clientId,
+        timestamp: new Date().toISOString(),
+        message: 'Welcome to Traversion Real-time Updates'
+      }));
+
+      // Handle client messages
+      ws.on('message', (data) => {
+        try {
+          const message = JSON.parse(data);
+          this.handleWebSocketMessage(ws, message);
+        } catch (error) {
+          logger.error('Invalid WebSocket message', { error: error.message });
+        }
+      });
+
+      // Handle ping/pong for connection health
+      ws.on('pong', () => {
+        ws.isAlive = true;
+      });
+
+      ws.on('close', () => {
+        this.wsClients.delete(ws);
+        logger.info('WebSocket client disconnected', {
+          clientId,
+          remainingClients: this.wsClients.size
+        });
+      });
+
+      ws.on('error', (error) => {
+        logger.error('WebSocket error', { clientId, error: error.message });
+      });
+    });
+
+    // Keep connections alive
+    this.wsHeartbeat = setInterval(() => {
+      this.wss.clients.forEach((ws) => {
+        if (!ws.isAlive) {
+          this.wsClients.delete(ws);
+          return ws.terminate();
+        }
+        ws.isAlive = false;
+        ws.ping();
+      });
+    }, 30000);
+
+    logger.info('WebSocket server initialized');
+  }
+
+  handleWebSocketMessage(ws, message) {
+    const { type, data } = message;
+
+    switch (type) {
+      case 'subscribe':
+        ws.subscriptions = ws.subscriptions || new Set();
+        ws.subscriptions.add(data.channel);
+        ws.send(JSON.stringify({
+          type: 'subscribed',
+          channel: data.channel
+        }));
+        break;
+
+      case 'unsubscribe':
+        if (ws.subscriptions) {
+          ws.subscriptions.delete(data.channel);
+        }
+        break;
+
+      case 'ping':
+        ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+        break;
+
+      default:
+        logger.debug('Unknown WebSocket message type', { type });
+    }
+  }
+
+  broadcast(data, channel = null) {
+    const message = JSON.stringify({
+      ...data,
+      timestamp: new Date().toISOString()
+    });
+
+    this.wss.clients.forEach((client) => {
+      if (client.readyState === 1) { // WebSocket.OPEN
+        // If channel specified, only send to subscribed clients
+        if (channel && client.subscriptions && !client.subscriptions.has(channel)) {
+          return;
+        }
+        client.send(message);
+      }
+    });
   }
 
   setupMiddleware() {
@@ -100,10 +266,50 @@ class TraversionApp {
 
     // Request logging
     this.app.use((req, res, next) => {
-      console.log(`${new Date().toISOString()} ${req.method} ${req.path} ${req.user ? `[${req.user.username}]` : '[anonymous]'}`);
+      logger.logApiRequest(req.method, req.path, 0, 0);
       rateLimiter.logRequest(req, false);
       next();
     });
+  }
+
+  startRealtimeFeatures() {
+    // Monitor Git repository for changes
+    if (config.get('features.realtime')) {
+      setInterval(async () => {
+        try {
+          const status = await this.git.status();
+          if (status.modified.length > 0 || status.created.length > 0) {
+            this.broadcast({
+              type: 'git_change',
+              data: {
+                modified: status.modified,
+                created: status.created,
+                deleted: status.deleted,
+                branch: status.current
+              }
+            }, 'git');
+          }
+        } catch (error) {
+          logger.debug('Git status check failed', { error: error.message });
+        }
+      }, 5000); // Check every 5 seconds
+
+      logger.info('Real-time Git monitoring started');
+    }
+
+    // Send metrics updates
+    setInterval(() => {
+      const metrics = {
+        type: 'metrics',
+        data: {
+          uptime: process.uptime(),
+          memory: process.memoryUsage(),
+          clients: this.wsClients.size,
+          timestamp: Date.now()
+        }
+      };
+      this.broadcast(metrics, 'metrics');
+    }, 10000); // Every 10 seconds
   }
 
   setupRoutes() {
@@ -203,12 +409,29 @@ class TraversionApp {
       try {
         const log = await this.git.log({ n: 20 });
 
-        const timeline = log.all.map(commit => ({
-          hash: commit.hash,
-          message: commit.message,
-          author: commit.author_name,
-          date: commit.date,
-          risk: this.calculateBasicRisk(commit)
+        const timeline = await Promise.all(log.all.map(async commit => {
+          // Get file changes for the commit
+          const diff = await this.git.show([commit.hash, '--stat']);
+          const filesChanged = diff.split('\n')
+            .filter(line => line.includes('|'))
+            .map(line => line.split('|')[0].trim());
+
+          const riskAnalysis = this.riskAnalyzer.calculateCommitRisk({
+            date: commit.date,
+            message: commit.message,
+            filesChanged,
+            linesChanged: commit.body?.length || 0
+          });
+
+          return {
+            hash: commit.hash,
+            message: commit.message,
+            author: commit.author_name,
+            date: commit.date,
+            risk: riskAnalysis.score,
+            riskLevel: riskAnalysis.level,
+            riskFactors: riskAnalysis.factors
+          };
         }));
 
         res.json({
@@ -217,7 +440,7 @@ class TraversionApp {
           total: log.total
         });
       } catch (error) {
-        console.error('Timeline error:', error);
+        logger.error('Timeline error', { error: error.message, stack: error.stack });
         res.status(500).json({
           success: false,
           error: error.message
@@ -238,12 +461,46 @@ class TraversionApp {
         });
 
         // Analyze commits for risk
-        const suspiciousCommits = log.all
-          .map(commit => ({
-            ...commit,
-            riskScore: this.calculateIncidentRisk(commit, incidentTime),
-            risk: this.calculateBasicRisk(commit)
-          }))
+        const suspiciousCommits = await Promise.all(
+          log.all.map(async commit => {
+            // Get file changes for better risk analysis
+            const diff = await this.git.show([commit.hash, '--stat']);
+            const filesChanged = diff.split('\n')
+              .filter(line => line.includes('|'))
+              .map(line => line.split('|')[0].trim());
+
+            const riskAnalysis = this.riskAnalyzer.calculateCommitRisk({
+              date: commit.date,
+              message: commit.message,
+              filesChanged,
+              linesChanged: commit.body?.length || 0
+            }, {
+              affectedFiles: req.body.files
+            });
+
+            // Calculate incident proximity score
+            const commitTime = new Date(commit.date);
+            const timeDiff = Math.abs(incidentTime - commitTime);
+            const hoursDiff = timeDiff / (1000 * 60 * 60);
+
+            let proximityBoost = 0;
+            if (hoursDiff < 1) proximityBoost = 0.5;
+            else if (hoursDiff < 6) proximityBoost = 0.3;
+            else if (hoursDiff < 24) proximityBoost = 0.1;
+
+            return {
+              ...commit,
+              riskScore: Math.min(riskAnalysis.score + proximityBoost, 1.0),
+              risk: riskAnalysis.score,
+              riskLevel: riskAnalysis.level,
+              riskFactors: riskAnalysis.factors,
+              proximityHours: hoursDiff
+            };
+          })
+        );
+
+        // Filter and sort suspicious commits
+        const filteredCommits = suspiciousCommits
           .filter(commit => commit.riskScore > 0.3)
           .sort((a, b) => b.riskScore - a.riskScore)
           .slice(0, 5);
@@ -260,19 +517,49 @@ class TraversionApp {
           'Incident Analysis',
           `Analysis for incident at ${incidentTime.toISOString()}`,
           'medium',
-          JSON.stringify({ suspiciousCommits })
+          JSON.stringify({ suspiciousCommits: filteredCommits })
         );
+
+        // Perform causality analysis if enabled
+        let causalityAnalysis = null;
+        if (config.get('features.ml')) {
+          try {
+            causalityAnalysis = await causalityService.analyzeCommitCausality(
+              filteredCommits,
+              incidentTime
+            );
+
+            // Get additional insights
+            const insights = causalityService.getIncidentInsights(incidentId);
+            causalityAnalysis.insights = insights;
+          } catch (error) {
+            logger.warn('Causality analysis failed', { error: error.message });
+          }
+        }
+
+        // Broadcast incident to WebSocket clients
+        this.broadcast({
+          type: 'new_incident',
+          data: {
+            incidentId,
+            incidentTime: incidentTime.toISOString(),
+            suspiciousCommits: filteredCommits.length,
+            topRisk: filteredCommits[0]?.riskScore || 0,
+            analyzedBy: req.user?.username || 'anonymous'
+          }
+        }, 'incidents');
 
         res.json({
           success: true,
           incidentId,
           incidentTime: incidentTime.toISOString(),
-          suspiciousCommits,
-          recommendations: this.generateRecommendations(suspiciousCommits)
+          suspiciousCommits: filteredCommits,
+          recommendations: this.generateRecommendations(filteredCommits),
+          causalityAnalysis
         });
 
       } catch (error) {
-        console.error('Incident analysis error:', error);
+        logger.error('Incident analysis error', { error: error.message, stack: error.stack });
         res.status(500).json({
           success: false,
           error: error.message
@@ -299,6 +586,14 @@ class TraversionApp {
           error: error.message
         });
       }
+    });
+
+    // Serve static files (including dashboard)
+    this.app.use('/public', express.static('public'));
+
+    // Dashboard route
+    this.app.get('/dashboard', (req, res) => {
+      res.sendFile(path.join(process.cwd(), 'public', 'dashboard.html'));
     });
 
     // Basic web interface
@@ -352,6 +647,18 @@ class TraversionApp {
             <p>Uptime: ${Math.floor(process.uptime() / 60)} minutes</p>
           </div>
 
+          <h2>🚀 Features</h2>
+
+          <div class="endpoint">
+            <span class="method" style="background: #10b981">NEW</span> <a href="/dashboard" target="_blank"><code>/dashboard</code></a>
+            <p>📊 Real-time Dashboard with WebSocket Updates</p>
+          </div>
+
+          <div class="endpoint">
+            <span class="method">DOCS</span> <a href="/api-docs" target="_blank"><code>/api-docs</code></a>
+            <p>📚 Interactive API Documentation (Swagger UI)</p>
+          </div>
+
           <h2>API Endpoints</h2>
 
           <div class="endpoint">
@@ -396,7 +703,7 @@ class TraversionApp {
 
     // Error handler
     this.app.use((err, req, res, next) => {
-      console.error('Error:', err);
+      logger.error('Unhandled error', { error: err.message, stack: err.stack });
       res.status(500).json({
         error: err.message || 'Internal server error'
       });
@@ -480,21 +787,21 @@ class TraversionApp {
 
   async start() {
     return new Promise((resolve, reject) => {
-      this.server = this.app.listen(this.port, (err) => {
+      this.server.listen(this.port, (err) => {
         if (err) {
-          console.error('Failed to start server:', err);
+          logger.error('Failed to start server', { error: err.message });
           reject(err);
         } else {
-          console.log(`
-╔════════════════════════════════════════╗
-║         Traversion Started             ║
-╠════════════════════════════════════════╣
-║  Web Interface: http://localhost:${this.port}  ║
-║  Health Check:  /health                ║
-║  API Info:      /api/info              ║
-║  Timeline:      /api/timeline          ║
-╚════════════════════════════════════════╝
-          `);
+          logger.info('═════════════════════════════════════════');
+          logger.info('        Traversion Started                ');
+          logger.info('═════════════════════════════════════════');
+          logger.info(`Web Interface: http://localhost:${this.port}`);
+          logger.info('Health Check:  /health');
+          logger.info('API Info:      /api/info');
+          logger.info('Timeline:      /api/timeline');
+          logger.info('API Docs:      /api-docs');
+          logger.info('WebSocket:     ws://localhost:' + this.port + '/ws');
+          logger.info('═════════════════════════════════════════');
           resolve(this.server);
         }
       });
@@ -504,11 +811,11 @@ class TraversionApp {
   stop() {
     if (this.server) {
       this.server.close();
-      console.log('Server stopped');
+      logger.info('Server stopped');
     }
     if (this.db) {
       this.db.close();
-      console.log('Database closed');
+      logger.info('Database closed');
     }
   }
 }
@@ -523,13 +830,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   // Graceful shutdown
   process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down...');
+    logger.warn('SIGTERM received, shutting down...');
     app.stop();
     process.exit(0);
   });
 
   process.on('SIGINT', () => {
-    console.log('SIGINT received, shutting down...');
+    logger.warn('SIGINT received, shutting down...');
     app.stop();
     process.exit(0);
   });

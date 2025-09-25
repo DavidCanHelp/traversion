@@ -32,7 +32,9 @@
     "health": "curl -f http://localhost:3333/api/timeline || echo 'Traversion not running'",
     "tracker": "node -e \"import('./src/tracking/deploymentTracker.js').then(m => new m.DeploymentTracker().start())\"",
     "rollback": "node -e \"import('./src/automation/rollbackGenerator.js').then(m => console.log('Rollback generator loaded'))\"",
-    "feedback": "node -e \"import('./src/learning/feedbackLoop.js').then(m => console.log('Feedback loop system ready'))\""
+    "feedback": "node -e \"import('./src/learning/feedbackLoop.js').then(m => console.log('Feedback loop system ready'))\"",
+    "docs": "node src/docs/swagger-server.js",
+    "docs:dev": "nodemon src/docs/swagger-server.js"
   },
   "keywords": [
     "incident-response",
@@ -75,9 +77,11 @@
     "ora": "^7.0.1",
     "pg": "^8.11.3",
     "simple-git": "^3.20.0",
+    "swagger-ui-express": "^5.0.1",
     "tar": "^6.2.0",
     "uuid": "^9.0.1",
-    "ws": "^8.14.2"
+    "ws": "^8.14.2",
+    "yamljs": "^0.3.0"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

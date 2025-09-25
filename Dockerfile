@@ -1,72 +1,71 @@
-# Multi-stage build for production optimization
-FROM node:18-alpine AS dependencies
+# Multi-stage Dockerfile for Traversion
+# Stage 1: Builder
+FROM node:20-alpine AS builder
 
+# Install build dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git
+
+# Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --only=production && \
+    npm cache clean --force
 
-# Build stage
-FROM node:18-alpine AS build
+# Copy application source
+COPY src/ ./src/
+COPY swagger.yaml ./
+COPY .env.example ./
 
+# Stage 2: Runtime
+FROM node:20-alpine
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    git \
+    tini \
+    && addgroup -g 1000 traversion \
+    && adduser -D -u 1000 -G traversion traversion
+
+# Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy from builder
+COPY --from=builder --chown=traversion:traversion /app/node_modules ./node_modules
+COPY --chown=traversion:traversion package*.json ./
+COPY --chown=traversion:traversion src/ ./src/
+COPY --chown=traversion:traversion swagger.yaml ./
+COPY --chown=traversion:traversion .env.example ./
 
-# Install all dependencies (including devDependencies for building)
-RUN npm ci
+# Create data directories
+RUN mkdir -p .traversion/logs .traversion/backups && \
+    chown -R traversion:traversion .traversion
 
-# Copy source code
-COPY . .
-
-# Run tests
-RUN npm test
-
-# Production stage
-FROM node:18-alpine AS production
-
-# Install security updates
-RUN apk update && apk upgrade && apk add --no-cache \
-    dumb-init \
-    curl \
-    && rm -rf /var/cache/apk/*
-
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S traversion -u 1001 -G nodejs
-
-WORKDIR /app
-
-# Copy dependencies from dependencies stage
-COPY --from=dependencies --chown=traversion:nodejs /app/node_modules ./node_modules
-
-# Copy application code
-COPY --chown=traversion:nodejs . .
-
-# Create necessary directories
-RUN mkdir -p /app/backups /app/logs /tmp && \
-    chown -R traversion:nodejs /app/backups /app/logs /tmp
-
-# Set permissions
-RUN chmod -R 755 /app && \
-    chmod -R 777 /app/backups /app/logs /tmp
-
-# Switch to non-root user
-USER traversion
-
-# Expose ports
-EXPOSE 3333 3334 9090
+# Set environment defaults
+ENV NODE_ENV=production \
+    PORT=3335 \
+    LOG_LEVEL=info \
+    DATA_DIR=/app/.traversion
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3333/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD node -e "fetch('http://localhost:3335/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
-# Use dumb-init for proper signal handling
-ENTRYPOINT ["dumb-init", "--"]
+# Use non-root user
+USER traversion
 
-# Start the application
-CMD ["node", "src/api/server.js"]
+# Expose port
+EXPOSE 3335
+
+# Use tini as entrypoint for proper signal handling
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# Start application
+CMD ["node", "src/app.js"]

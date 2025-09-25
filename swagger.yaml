@@ -1,0 +1,565 @@
+openapi: 3.0.3
+info:
+  title: Traversion API
+  description: Post-incident code forensics and impact analysis for development teams
+  version: 0.1.0
+  contact:
+    name: Traversion Team
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3335
+    description: Development server
+  - url: https://api.traversion.com
+    description: Production server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the health status of the application
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Application is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/info:
+    get:
+      summary: Get application information
+      description: Returns basic information about the Traversion application
+      tags:
+        - Information
+      responses:
+        '200':
+          description: Application information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  app:
+                    type: string
+                    example: Traversion
+                  version:
+                    type: string
+                    example: 0.1.0
+                  status:
+                    type: string
+                    example: running
+                  uptime:
+                    type: number
+                    description: Application uptime in seconds
+                  environment:
+                    type: string
+                    example: development
+                  authenticated:
+                    type: boolean
+                    description: Whether the request is authenticated
+
+  /api/auth/register:
+    post:
+      summary: Register a new user
+      description: Create a new user account
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - email
+                - password
+              properties:
+                username:
+                  type: string
+                  pattern: '^[a-zA-Z0-9_-]{3,30}$'
+                  description: Username (3-30 characters, letters, numbers, underscore, hyphen only)
+                  example: johndoe
+                email:
+                  type: string
+                  format: email
+                  description: Valid email address
+                  example: john@example.com
+                password:
+                  type: string
+                  pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$'
+                  description: Password (min 8 chars with uppercase, lowercase, and number)
+                  example: Password123
+      responses:
+        '200':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Registration failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/login:
+    post:
+      summary: Login user
+      description: Authenticate user and return JWT token
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  description: Username or email
+                  example: johndoe
+                password:
+                  type: string
+                  description: User password
+                  example: Password123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  token:
+                    type: string
+                    description: JWT authentication token
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/logout:
+    post:
+      summary: Logout user
+      description: Invalidate the current session
+      tags:
+        - Authentication
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/me:
+    get:
+      summary: Get current user
+      description: Returns information about the currently authenticated user
+      tags:
+        - Authentication
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/api-key:
+    post:
+      summary: Generate API key
+      description: Generate a new API key for the authenticated user
+      tags:
+        - Authentication
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                  description: Optional name for the API key
+                  example: Production Key
+      responses:
+        '200':
+          description: API key generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  apiKey:
+                    type: string
+                    description: The generated API key (only shown once)
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/timeline:
+    get:
+      summary: Get Git commit timeline
+      description: Returns recent commits with risk analysis
+      tags:
+        - Analysis
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      responses:
+        '200':
+          description: Timeline retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  commits:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Commit'
+                  total:
+                    type: integer
+                    description: Total number of commits
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /api/incident:
+    post:
+      summary: Analyze incident
+      description: Analyze commits around an incident time to find suspicious changes
+      tags:
+        - Analysis
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                time:
+                  type: string
+                  format: date-time
+                  description: Incident time (ISO 8601 format)
+                  example: "2024-01-15T14:30:00Z"
+                hours:
+                  type: integer
+                  minimum: 1
+                  maximum: 720
+                  default: 24
+                  description: Hours to look back from incident time (max 30 days)
+                  example: 24
+                files:
+                  type: array
+                  items:
+                    type: string
+                    maxLength: 500
+                  maxItems: 50
+                  description: Optional list of files to focus analysis on
+      responses:
+        '200':
+          description: Incident analysis completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  incidentId:
+                    type: string
+                    description: Unique incident identifier
+                  incidentTime:
+                    type: string
+                    format: date-time
+                  suspiciousCommits:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SuspiciousCommit'
+                  recommendations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Recommendation'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /api/incidents:
+    get:
+      summary: List recent incidents
+      description: Returns a list of recently analyzed incidents
+      tags:
+        - Analysis
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      responses:
+        '200':
+          description: Incidents retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  incidents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Incident'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /api/auth/login
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API key obtained from /api/auth/api-key
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique user identifier
+        username:
+          type: string
+          description: Username
+        email:
+          type: string
+          format: email
+          description: User email address
+        role:
+          type: string
+          enum: [user, admin]
+          description: User role
+
+    Commit:
+      type: object
+      properties:
+        hash:
+          type: string
+          description: Git commit hash
+        message:
+          type: string
+          description: Commit message
+        author:
+          type: string
+          description: Commit author name
+        date:
+          type: string
+          format: date-time
+          description: Commit date
+        risk:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Risk score (0-1)
+
+    SuspiciousCommit:
+      allOf:
+        - $ref: '#/components/schemas/Commit'
+        - type: object
+          properties:
+            riskScore:
+              type: number
+              minimum: 0
+              maximum: 1
+              description: Incident-specific risk score
+
+    Incident:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Incident identifier
+        title:
+          type: string
+          description: Incident title
+        description:
+          type: string
+          description: Incident description
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+          description: Incident severity
+        created_at:
+          type: string
+          format: date-time
+          description: When the incident was created
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the incident was resolved
+
+    Recommendation:
+      type: object
+      properties:
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+          description: Recommendation priority
+        action:
+          type: string
+          description: Recommended action
+        description:
+          type: string
+          description: Detailed recommendation description
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: Field that failed validation
+              message:
+                type: string
+                description: Validation error message
+              value:
+                description: The invalid value
+
+    RateLimitError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Rate limit error message
+        retryAfter:
+          type: string
+          description: When to retry the request
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Information
+    description: Application information
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Analysis
+    description: Incident analysis and forensics

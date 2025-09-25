@@ -1,316 +1,290 @@
 # 🕵️ Traversion
 
-**Post-incident forensics and impact analysis for development teams**
+**Open Source Incident Analysis Platform - Real-time Git forensics for faster incident resolution**
 
-Stop guessing what caused your production incidents. Traversion analyzes your Git history to identify suspicious commits, assess pull request risks, and provide actionable insights for faster incident resolution.
+Stop guessing what caused your production incidents. Traversion analyzes your Git history, detects risky commits, and provides real-time insights through a beautiful dashboard interface.
+
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
+
+## 🚀 One-Line Setup
+
+```bash
+git clone https://github.com/davidcanhelp/traversion && cd traversion && ./setup.sh
+```
+
+That's it! The setup script handles everything - dependencies, environment, secrets, and database initialization.
 
 ## 🎯 What Problem Does It Solve?
 
 When production breaks, you need answers fast:
 - **Which recent changes could have caused this?**
-- **What was risky about that deployment?** 
+- **What was risky about that deployment?**
 - **Who should we involve in the investigation?**
 - **What patterns led to this incident?**
 
-Traditional Git tools show *what* changed, but not *why* it might be problematic. Traversion analyzes commits using risk factors to highlight the most likely culprits.
+Traversion provides instant answers through:
+- 🔍 **Automated Git forensics** - Analyzes commits with multi-factor risk scoring
+- 📊 **Real-time dashboard** - WebSocket-powered live incident monitoring
+- 🤖 **Causality detection** - Identifies root causes and blame chains
+- 🛡️ **Security-first** - JWT auth, rate limiting, input validation built-in
+- 📈 **Visual analytics** - Beautiful charts showing risk distribution and timeline
 
-## ⚡ Quick Start
+## ✨ Key Features
 
+### Real-Time Dashboard
+- **Live incident feed** with WebSocket updates
+- **Risk distribution charts** using Chart.js
+- **Git activity monitoring** in real-time
+- **System metrics** and health monitoring
+- **Beautiful gradient UI** with Tailwind CSS
+
+### Advanced Analysis Engine
+- **Multi-factor risk scoring** (timing, changes, context)
+- **Causality detection** with root cause analysis
+- **Pattern recognition** for recurring issues
+- **Historical timeline analysis**
+- **File impact assessment**
+
+### Enterprise-Ready Security
+- **JWT authentication** with bcrypt hashing
+- **Multi-tier rate limiting** (100/15min default)
+- **Input validation** with Joi schemas
+- **Helmet security headers**
+- **CORS configuration**
+- **Secret rotation support**
+
+### Developer Experience
+- **One-line setup** with automatic configuration
+- **RESTful API** with Swagger documentation
+- **WebSocket support** for real-time updates
+- **Docker support** for containerization
+- **Comprehensive logging** with winston
+- **Environment validation**
+
+## 📊 Dashboard Preview
+
+```
+╔══════════════════════════════════════════════════════════╗
+║  🕵️ Traversion - Real-time Incident Analysis            ║
+╠══════════════════════════════════════════════════════════╣
+║  Active Incidents: 3    High Risk: 1    Connected: 5    ║
+║                                                          ║
+║  📈 Risk Distribution        🔴 High    15%             ║
+║      [████████████████]      🟡 Medium  35%             ║
+║                               🟢 Low     50%             ║
+║                                                          ║
+║  📡 Live Incident Feed                                  ║
+║  ├─ INC-2024-001 • Risk: 85% • 2 commits • 2:34 PM    ║
+║  ├─ INC-2024-002 • Risk: 45% • 1 commit  • 2:15 PM    ║
+║  └─ INC-2024-003 • Risk: 20% • 3 commits • 1:45 PM    ║
+╚══════════════════════════════════════════════════════════╝
+```
+
+## 🎯 Quick Start
+
+### 1. Clone and Setup (30 seconds)
 ```bash
-# Install globally
-npm install -g traversion
-
-# Analyze an incident from 2 hours ago
-trav incident --time "2 hours ago" --hours 24
-
-# Analyze a risky PR before merging  
-trav pr microsoft/vscode/1234 --comment
-
-# Start web interface for team use
-npm start
-```
-
-## 🔍 Core Features
-
-### 1. **Incident Forensics**
-Quickly identify suspicious commits around incident time:
-
-```bash
-trav incident --time "2023-12-01T15:30:00Z" --hours 48 --files "server.js,database.js"
-```
-
-**Risk Scoring Based On:**
-- Off-hours deployments (weekends, nights)
-- Configuration and infrastructure changes  
-- Large or widespread code changes
-- Vague commit messages ("fix", "update")
-- Changes to affected files
-- Database migrations and schema changes
-
-### 2. **Pull Request Impact Analysis**
-Assess risk before merging:
-
-```bash
-trav pr owner/repo/123 --comment
-```
-
-**Analyzes:**
-- File change patterns and risk areas
-- Deployment complexity and testing needs  
-- Scope and potential blast radius
-- Automated risk scoring and recommendations
-
-### 3. **Interactive Web Interface**
-Perfect for team incident response:
-
-```bash
-npm start  # Visit http://localhost:3335
-```
-
-- Visual incident timeline analysis
-- PR risk assessment dashboard
-- Team-friendly reports and recommendations
-- No technical Git knowledge required
-
-## 📊 Example Output
-
-### Incident Analysis:
-```
-🚨 INCIDENT FORENSICS REPORT
-═══════════════════════════════════════════════════════════
-🕐 Incident Time: 2023-12-01T15:30:00Z
-📅 Analysis Window: 24 hours  
-🔍 Suspicious Commits: 3
-
-🎯 TOP SUSPECTS:
-1. 🚨 a1b2c3d4 hotfix: update database connection timeout
-   👤 john.doe | ⏰ 12/01/2023, 2:15:00 PM
-   📊 Risk: 85% | Files: 2 | +15/-3
-   🏷️ Off-hours deployment, Configuration changes, Urgent/fix commit
-
-2. ⚠️ e5f6g7h8 refactor user authentication module  
-   👤 jane.smith | ⏰ 12/01/2023, 11:30:00 AM
-   📊 Risk: 65% | Files: 8 | +234/-156
-   🏷️ Security changes, Large code changes
-
-💡 RECOMMENDATIONS:
-🔴 INVESTIGATION: Start with commit a1b2c3d4 - highest risk score
-🔴 ROLLBACK: Consider rolling back 1 high-risk commit if safe
-🟡 CONFIG: Configuration changes detected - verify environment variables
-```
-
-### PR Analysis:
-```
-📋 PULL REQUEST ANALYSIS  
-═══════════════════════════════════════════════════════════
-🚨 PR #1234: Implement user session management
-👤 Author: contributor
-📊 Risk Score: 72%
-📈 Changes: +445 -123 (12 files)
-
-📊 IMPACT ASSESSMENT:
-   Scope: Medium - affects multiple components
-   Complexity: Medium-High - security changes
-   Risk Areas: Security, Configuration, Database
-
-🧪 TESTING RECOMMENDATIONS:
-   • Security regression testing
-   • Authentication/authorization testing  
-   • Full regression testing
-   • Performance testing
-
-💡 RECOMMENDATIONS:
-🔴 REVIEW: High-risk PR - require multiple senior reviewers
-🔴 SECURITY: Require security team review for auth changes
-🟡 PROCESS: Add detailed description explaining security implications
-```
-
-## 🛠️ Installation & Setup
-
-### Prerequisites
-- Node.js 18+
-- Git repository
-- GitHub token (optional, for PR analysis)
-
-### Install
-```bash
-npm install -g traversion
-
-# Or run locally  
-git clone https://github.com/your-org/traversion
+# Clone the repository
+git clone https://github.com/davidcanhelp/traversion
 cd traversion
-npm install
+
+# Run the setup script - handles everything!
+./setup.sh
 ```
 
-### Configuration
+### 2. Start the Application
 ```bash
-# Set GitHub token for PR analysis (optional)
-export GITHUB_TOKEN=your_github_token
-
-# Configure custom risk patterns (optional)
-export TRAVERSION_CONFIG=/path/to/config.json
+npm start
+# Application runs on http://localhost:3335
 ```
 
-## 📋 CLI Commands
+### 3. Access the Dashboard
+Open your browser to: http://localhost:3335/dashboard
 
-| Command | Description | Example |
-|---------|-------------|---------|
-| `trav incident` | Analyze incident timeline | `trav incident --time "2 hours ago"` |
-| `trav pr` | Analyze pull request | `trav pr owner/repo/123 --comment` |
-| `trav analyze` | Analyze specific commits | `trav analyze --commits "abc123,def456"` |
-| `trav forensics` | Interactive incident mode | `trav forensics` |
+### 4. View API Documentation
+Swagger docs available at: http://localhost:3335/api-docs
 
-### Incident Analysis Options
+## 🔧 API Examples
+
+### Register User
 ```bash
-trav incident [options]
-  -t, --time <time>     Incident time (ISO string or "X hours ago")
-  -h, --hours <hours>   Hours to look back (default: 24)  
-  -f, --files <files>   Comma-separated affected files
+curl -X POST http://localhost:3335/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"demo","password":"Demo123456","email":"demo@example.com"}'
 ```
 
-### PR Analysis Options  
+### Login and Get Token
 ```bash
-trav pr <owner>/<repo>/<number> [options]
-  --comment             Post analysis as PR comment
+curl -X POST http://localhost:3335/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"demo","password":"Demo123456"}'
 ```
 
-## 🎯 Use Cases
-
-### 1. **Post-Incident Analysis**
-When production breaks, immediately run:
-```bash  
-trav incident --time "30 minutes ago" --hours 24
-```
-Get a ranked list of suspicious commits to investigate first.
-
-### 2. **Pre-Deployment Risk Assessment**  
-Before merging high-risk PRs:
+### Analyze Incident
 ```bash
-trav pr your-org/your-repo/456 --comment  
-```
-Automatically comment with risk assessment and testing recommendations.
-
-### 3. **Code Review Enhancement**
-Add Traversion analysis to your PR template or CI pipeline to surface risks that human reviewers might miss.
-
-### 4. **Incident Response Training**
-Use historical incidents to train teams on pattern recognition and investigation techniques.
-
-## ⚙️ How It Works
-
-### Risk Scoring Algorithm
-Commits are scored (0-1.0) based on:
-
-**Timing Factors (0.2)**
-- Weekend/off-hours deployments
-- Holiday deployments  
-
-**Change Factors (0.4)**  
-- Configuration files (`config`, `env`, `.yml`)
-- Database changes (`migration`, `schema`, `.sql`)
-- Infrastructure (`Dockerfile`, `k8s/`, `deploy/`)
-- Security code (`auth`, `login`, `security`)
-- Large changesets (>500 lines)
-
-**Context Factors (0.4)**
-- Urgent keywords (`hotfix`, `critical`, `emergency`)
-- Vague commit messages  
-- Changes to incident-affected files
-- Multiple files modified
-
-### PR Risk Assessment
-Evaluates:
-- **File change patterns** - What types of files were modified
-- **Scope analysis** - How many components are affected  
-- **Complexity assessment** - Database, security, infrastructure changes
-- **Testing requirements** - What types of testing are needed
-- **Deployment risks** - Potential issues during rollout
-
-## 🚀 Integration
-
-### GitHub Actions
-```yaml
-- name: Analyze PR Risk
-  run: |
-    npx traversion pr ${{ github.repository }}/${{ github.event.number }} --comment
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+curl -X POST http://localhost:3335/api/incidents/analyze \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"commitHash":"HEAD","branch":"main"}'
 ```
 
-### Slack/Discord Webhooks
-```bash  
-trav incident --time "1 hour ago" --json | curl -X POST -H 'Content-type: application/json' --data @- YOUR_WEBHOOK_URL
-```
-
-### Monitoring Integration
+### WebSocket Connection
 ```javascript
-// When incident detected
-const analysis = await traversion.analyzeIncident(new Date(), 24, affectedFiles);
-await alertManager.send(`Top suspect: ${analysis.suspiciousCommits[0].shortHash}`);
+const ws = new WebSocket('ws://localhost:3335/ws');
+
+ws.on('open', () => {
+    // Subscribe to incidents
+    ws.send(JSON.stringify({
+        type: 'subscribe',
+        data: { channel: 'incidents' }
+    }));
+});
+
+ws.on('message', (data) => {
+    const message = JSON.parse(data);
+    console.log('Received:', message);
+});
 ```
 
-## 🎛️ Configuration
+## 🏗️ Architecture
 
-### Custom Risk Patterns
-Create `traversion.config.js`:
-```javascript
-export default {
-  riskPatterns: {
-    'Payment System': /payment|billing|stripe|paypal/i,
-    'User Data': /user|profile|account|personal/i,
-    'Critical API': /api\/(auth|payment|user)/i
+```
+traversion/
+├── src/
+│   ├── app.js                 # Main application with WebSocket
+│   ├── middleware/
+│   │   ├── auth.js           # JWT authentication
+│   │   ├── rateLimiter.js    # Rate limiting
+│   │   └── validation.js     # Input validation
+│   ├── services/
+│   │   ├── riskAnalyzer.js   # Risk scoring engine
+│   │   └── causality.js      # Root cause detection
+│   ├── engine/
+│   │   └── causalityEngine.js # Advanced analysis
+│   └── config/
+│       └── environment.js     # Environment validation
+├── public/
+│   └── dashboard.html         # Real-time dashboard UI
+└── setup.sh                   # One-line setup script
+```
+
+## 🔍 How Risk Scoring Works
+
+Traversion uses a sophisticated multi-factor risk assessment:
+
+### Risk Factors (Score: 0.0 - 1.0)
+
+**🕐 Timing Risk (20%)**
+- Weekend deployments (+0.3)
+- Off-hours commits (+0.2)
+- Holiday periods (+0.4)
+
+**📁 File Risk (40%)**
+- Configuration changes (+0.5)
+- Database migrations (+0.6)
+- Security files (+0.7)
+- Infrastructure (+0.5)
+
+**📝 Context Risk (40%)**
+- Urgent keywords (+0.4)
+- Vague messages (+0.3)
+- Large changes (+0.3)
+- Multiple files (+0.2)
+
+### Example Analysis Output
+```json
+{
+  "incidentId": "INC-2024-001",
+  "topRisk": 0.85,
+  "suspiciousCommits": 3,
+  "rootCause": {
+    "commit": "a1b2c3d",
+    "file": "database/config.js",
+    "reason": "Off-hours configuration change"
   },
-  riskWeights: {
-    offHours: 0.3,
-    largeChanges: 0.4,  
-    configChanges: 0.5
-  },
-  excludeFiles: ['*.test.js', '*.spec.js', 'docs/']
-};
+  "recommendations": [
+    "Review database configuration changes",
+    "Check connection pool settings",
+    "Verify environment variables"
+  ]
+}
 ```
 
-### Team Notification Rules
-```javascript
-export default {
-  notifications: {
-    highRisk: ['security-team@company.com'],
-    database: ['dba-team@company.com'],
-    infrastructure: ['devops-team@company.com']
-  }
-};
+## 🐳 Docker Deployment
+
+```bash
+# Build the image
+docker build -t traversion .
+
+# Run with Docker Compose
+docker-compose up -d
+
+# Access at http://localhost:3335
 ```
 
-## 🔮 Advanced Features
+## 🔒 Security Features
 
-### Machine Learning Enhancement (Coming Soon)
-- Historical incident pattern learning
-- Team-specific risk factor weighting  
-- Anomaly detection for unusual patterns
+- **Authentication**: JWT-based with configurable expiry
+- **Password Security**: Bcrypt hashing with salt rounds
+- **Rate Limiting**: Configurable per-endpoint limits
+- **Input Validation**: Joi schemas for all inputs
+- **Headers Security**: Helmet for security headers
+- **CORS**: Configurable cross-origin policies
+- **Secret Management**: Automatic rotation support
+- **Environment Validation**: Startup configuration checks
 
-### Integration Ecosystem (Coming Soon)
-- Jira incident linking
-- PagerDuty integration
-- DataDog/NewRelic correlation
-- Slack incident bot
+## 📈 Performance
+
+- **WebSocket Support**: Real-time updates without polling
+- **Efficient Algorithms**: O(n log n) risk scoring
+- **Database**: SQLite for simplicity, PostgreSQL ready
+- **Caching Ready**: Redis integration points
+- **Lazy Loading**: On-demand module loading
+- **Connection Pooling**: Optimized database connections
+
+## 🛠️ Configuration
+
+### Environment Variables (.env)
+```bash
+# Application
+PORT=3335
+NODE_ENV=production
+
+# Security
+JWT_SECRET=auto-generated-on-setup
+SESSION_SECRET=auto-generated-on-setup
+
+# Database
+DATABASE_URL=sqlite://traversion.db
+# DATABASE_URL=postgresql://user:pass@localhost/traversion
+
+# Features
+ENABLE_WEBSOCKET=true
+ENABLE_RATE_LIMITING=true
+RATE_LIMIT_WINDOW=900000
+RATE_LIMIT_MAX=100
+```
 
 ## 🤝 Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ### Development Setup
 ```bash
-git clone https://github.com/your-org/traversion
-cd traversion  
+# Install dependencies
 npm install
-npm test
-npm run dev
-```
 
-### Architecture
-- `src/forensics/` - Core analysis algorithms
-- `src/integrations/` - GitHub, Slack, etc. integrations
-- `src/cli/` - Command-line interface
-- `src/web/` - Web interface for teams
+# Run tests
+npm test
+
+# Run in development mode
+npm run dev
+
+# Run linting
+npm run lint
+```
 
 ## 📝 License
 
@@ -318,13 +292,21 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🆘 Support
 
-- 📖 [Documentation](https://traversion.dev/docs)  
-- 💬 [GitHub Discussions](https://github.com/your-org/traversion/discussions)
-- 🐛 [Report Issues](https://github.com/your-org/traversion/issues)
-- 📧 Support: support@traversion.dev
+- 📖 [Documentation](https://github.com/davidcanhelp/traversion/wiki)
+- 💬 [Discussions](https://github.com/davidcanhelp/traversion/discussions)
+- 🐛 [Issues](https://github.com/davidcanhelp/traversion/issues)
+
+## 🙏 Acknowledgments
+
+Built with powerful open source technologies:
+- Node.js & Express for the backend
+- WebSocket for real-time communication
+- Chart.js for beautiful visualizations
+- Tailwind CSS for styling
+- SQLite/PostgreSQL for data persistence
 
 ---
 
 **Stop playing detective with your incidents. Let Traversion do the investigating.**
 
-🔍 *Made with ❤️ for development teams who deserve better incident response.*
+🔍 *The best open source incident analysis tool - now with real-time monitoring!*

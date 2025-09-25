@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import Database from 'better-sqlite3';
+import secretManager from '../security/secretManager.js';
 
 /**
  * Authentication Middleware
@@ -9,9 +10,15 @@ import Database from 'better-sqlite3';
  */
 class AuthMiddleware {
   constructor(config = {}) {
-    this.jwtSecret = config.jwtSecret || process.env.JWT_SECRET || 'development-secret-change-in-production';
+    this.jwtSecret = config.jwtSecret || secretManager.get('JWT_SECRET', process.env.JWT_SECRET || 'development-secret-change-in-production');
     this.jwtExpiresIn = config.jwtExpiresIn || '24h';
     this.bcryptRounds = config.bcryptRounds || 10;
+
+    // Register for secret rotation
+    secretManager.onRotation('JWT_SECRET', (newSecret) => {
+      this.jwtSecret = newSecret;
+      console.log('JWT secret rotated successfully');
+    });
 
     // Initialize database
     this.db = new Database('./.traversion/database.db');

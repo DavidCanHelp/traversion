@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traversion - Real-time Incident Analysis Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        .pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-connected { background: #10b981; }
+        .status-disconnected { background: #ef4444; }
+
+        .risk-high { background: #ef4444; }
+        .risk-medium { background: #f59e0b; }
+        .risk-low { background: #10b981; }
+
+        .terminal {
+            background: #1a1a1a;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            border-radius: 8px;
+            height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            opacity: 0;
+            animation: fadeIn 0.3s ease-in-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen text-white">
+    <!-- Header -->
+    <nav class="bg-black bg-opacity-30 backdrop-blur-lg border-b border-white border-opacity-20">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-bold">🕵️ Traversion</h1>
+                    <span class="text-sm opacity-75">Real-time Incident Analysis</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div id="connection-status" class="flex items-center">
+                        <span class="status-indicator status-disconnected"></span>
+                        <span class="text-sm">Disconnected</span>
+                    </div>
+                    <button onclick="connectWebSocket()" class="px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition">
+                        Reconnect
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Dashboard -->
+    <div class="container mx-auto px-6 py-8">
+        <!-- Metrics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="card p-6 rounded-lg">
+                <h3 class="text-sm opacity-75 mb-2">Active Incidents</h3>
+                <p class="text-3xl font-bold" id="active-incidents">0</p>
+                <p class="text-xs mt-2 opacity-75">Last 24 hours</p>
+            </div>
+
+            <div class="card p-6 rounded-lg">
+                <h3 class="text-sm opacity-75 mb-2">High Risk Commits</h3>
+                <p class="text-3xl font-bold text-red-400" id="high-risk">0</p>
+                <p class="text-xs mt-2 opacity-75">Requires attention</p>
+            </div>
+
+            <div class="card p-6 rounded-lg">
+                <h3 class="text-sm opacity-75 mb-2">Connected Clients</h3>
+                <p class="text-3xl font-bold" id="client-count">0</p>
+                <p class="text-xs mt-2 opacity-75">Real-time monitoring</p>
+            </div>
+
+            <div class="card p-6 rounded-lg">
+                <h3 class="text-sm opacity-75 mb-2">System Uptime</h3>
+                <p class="text-3xl font-bold" id="uptime">0h</p>
+                <p class="text-xs mt-2 opacity-75">Since last restart</p>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Live Incidents Feed -->
+            <div class="lg:col-span-2 card p-6 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <span class="status-indicator status-connected pulse mr-2"></span>
+                    Live Incident Feed
+                </h2>
+                <div id="incidents-feed" class="space-y-3 max-h-96 overflow-y-auto">
+                    <div class="text-center py-8 opacity-50">
+                        <p>Waiting for incidents...</p>
+                        <p class="text-sm mt-2">Incidents will appear here in real-time</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Risk Distribution Chart -->
+            <div class="card p-6 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4">Risk Distribution</h2>
+                <canvas id="risk-chart" width="200" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Git Activity & System Logs -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <!-- Git Activity Monitor -->
+            <div class="card p-6 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4">Git Activity Monitor</h2>
+                <div id="git-activity" class="space-y-2 max-h-64 overflow-y-auto">
+                    <p class="text-sm opacity-50">Monitoring repository changes...</p>
+                </div>
+            </div>
+
+            <!-- System Logs -->
+            <div class="card p-6 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4">System Logs</h2>
+                <div id="system-logs" class="terminal">
+                    <div class="log-entry">System initialized...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline Chart -->
+        <div class="card p-6 rounded-lg mt-6">
+            <h2 class="text-xl font-semibold mb-4">Incident Timeline (Last 24h)</h2>
+            <canvas id="timeline-chart" height="100"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let reconnectInterval = null;
+        const incidents = [];
+        const metrics = { high: 0, medium: 0, low: 0 };
+
+        // Initialize Charts
+        const riskChartCtx = document.getElementById('risk-chart').getContext('2d');
+        const riskChart = new Chart(riskChartCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['High Risk', 'Medium Risk', 'Low Risk'],
+                datasets: [{
+                    data: [0, 0, 0],
+                    backgroundColor: ['#ef4444', '#f59e0b', '#10b981'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: 'white' }
+                    }
+                }
+            }
+        });
+
+        const timelineCtx = document.getElementById('timeline-chart').getContext('2d');
+        const timelineChart = new Chart(timelineCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Incidents',
+                    data: [],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        ticks: { color: 'white' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        ticks: { color: 'white' },
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: 'white' } }
+                }
+            }
+        });
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                updateConnectionStatus(true);
+                addSystemLog('Connected to Traversion server');
+
+                // Subscribe to channels
+                ws.send(JSON.stringify({ type: 'subscribe', data: { channel: 'incidents' } }));
+                ws.send(JSON.stringify({ type: 'subscribe', data: { channel: 'metrics' } }));
+                ws.send(JSON.stringify({ type: 'subscribe', data: { channel: 'git' } }));
+            };
+
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                handleMessage(message);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                addSystemLog('Connection error occurred', 'error');
+            };
+
+            ws.onclose = () => {
+                updateConnectionStatus(false);
+                addSystemLog('Disconnected from server');
+                scheduleReconnect();
+            };
+        }
+
+        function handleMessage(message) {
+            switch(message.type) {
+                case 'connected':
+                    addSystemLog(`Connected: ${message.message}`);
+                    break;
+
+                case 'new_incident':
+                    handleNewIncident(message.data);
+                    break;
+
+                case 'metrics':
+                    updateMetrics(message.data);
+                    break;
+
+                case 'git_change':
+                    handleGitChange(message.data);
+                    break;
+
+                default:
+                    console.log('Unknown message type:', message.type);
+            }
+        }
+
+        function handleNewIncident(incident) {
+            incidents.push(incident);
+            document.getElementById('active-incidents').textContent = incidents.length;
+
+            // Update high risk count
+            if (incident.topRisk > 0.7) {
+                metrics.high++;
+                document.getElementById('high-risk').textContent = metrics.high;
+            }
+
+            // Add to feed
+            const feed = document.getElementById('incidents-feed');
+            const incidentEl = document.createElement('div');
+            incidentEl.className = 'bg-white bg-opacity-10 rounded-lg p-4';
+
+            const riskClass = incident.topRisk > 0.7 ? 'risk-high' :
+                            incident.topRisk > 0.4 ? 'risk-medium' : 'risk-low';
+
+            incidentEl.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <span class="font-semibold">${incident.incidentId}</span>
+                    <span class="text-xs opacity-75">${new Date(incident.incidentTime).toLocaleTimeString()}</span>
+                </div>
+                <div class="flex items-center space-x-2 text-sm">
+                    <span class="status-indicator ${riskClass}"></span>
+                    <span>Risk: ${(incident.topRisk * 100).toFixed(0)}%</span>
+                    <span class="opacity-75">• ${incident.suspiciousCommits} commits</span>
+                </div>
+                <p class="text-xs mt-2 opacity-75">Analyzed by: ${incident.analyzedBy}</p>
+            `;
+
+            if (feed.children[0]?.classList?.contains('text-center')) {
+                feed.innerHTML = '';
+            }
+
+            feed.insertBefore(incidentEl, feed.firstChild);
+
+            // Update risk chart
+            updateRiskChart();
+
+            // Update timeline
+            updateTimeline();
+
+            addSystemLog(`New incident detected: ${incident.incidentId}`);
+        }
+
+        function updateMetrics(data) {
+            // Update uptime
+            const hours = Math.floor(data.uptime / 3600);
+            const minutes = Math.floor((data.uptime % 3600) / 60);
+            document.getElementById('uptime').textContent = `${hours}h ${minutes}m`;
+
+            // Update client count
+            document.getElementById('client-count').textContent = data.clients;
+
+            // Update memory usage in logs
+            const memMB = Math.round(data.memory.heapUsed / 1024 / 1024);
+            addSystemLog(`Memory: ${memMB}MB | Clients: ${data.clients}`, 'info');
+        }
+
+        function handleGitChange(data) {
+            const activity = document.getElementById('git-activity');
+
+            if (data.modified.length > 0 || data.created.length > 0) {
+                const entry = document.createElement('div');
+                entry.className = 'text-sm p-2 bg-white bg-opacity-10 rounded';
+                entry.innerHTML = `
+                    <p class="font-semibold">Branch: ${data.branch}</p>
+                    ${data.modified.length > 0 ? `<p>Modified: ${data.modified.join(', ')}</p>` : ''}
+                    ${data.created.length > 0 ? `<p>Created: ${data.created.join(', ')}</p>` : ''}
+                    <p class="text-xs opacity-75 mt-1">${new Date().toLocaleTimeString()}</p>
+                `;
+
+                if (activity.children[0]?.classList?.contains('opacity-50')) {
+                    activity.innerHTML = '';
+                }
+
+                activity.insertBefore(entry, activity.firstChild);
+            }
+        }
+
+        function updateRiskChart() {
+            const data = incidents.reduce((acc, inc) => {
+                if (inc.topRisk > 0.7) acc[0]++;
+                else if (inc.topRisk > 0.4) acc[1]++;
+                else acc[2]++;
+                return acc;
+            }, [0, 0, 0]);
+
+            riskChart.data.datasets[0].data = data;
+            riskChart.update();
+        }
+
+        function updateTimeline() {
+            const now = new Date();
+            const label = now.toLocaleTimeString();
+
+            if (timelineChart.data.labels.length > 20) {
+                timelineChart.data.labels.shift();
+                timelineChart.data.datasets[0].data.shift();
+            }
+
+            timelineChart.data.labels.push(label);
+            timelineChart.data.datasets[0].data.push(incidents.length);
+            timelineChart.update();
+        }
+
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connection-status');
+            const indicator = status.querySelector('.status-indicator');
+            const text = status.querySelector('span:last-child');
+
+            if (connected) {
+                indicator.className = 'status-indicator status-connected';
+                text.textContent = 'Connected';
+            } else {
+                indicator.className = 'status-indicator status-disconnected';
+                text.textContent = 'Disconnected';
+            }
+        }
+
+        function addSystemLog(message, level = 'info') {
+            const logs = document.getElementById('system-logs');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = level === 'error' ? '[ERROR]' : '[INFO]';
+            const color = level === 'error' ? '#ff6b6b' : '#00ff00';
+
+            entry.innerHTML = `<span style="color: ${color}">${prefix} ${timestamp}</span> ${message}`;
+            logs.appendChild(entry);
+
+            // Auto-scroll to bottom
+            logs.scrollTop = logs.scrollHeight;
+
+            // Limit to 50 logs
+            if (logs.children.length > 50) {
+                logs.removeChild(logs.firstChild);
+            }
+        }
+
+        function scheduleReconnect() {
+            if (reconnectInterval) return;
+
+            reconnectInterval = setInterval(() => {
+                addSystemLog('Attempting to reconnect...');
+                connectWebSocket();
+            }, 5000);
+        }
+
+        // Initialize
+        connectWebSocket();
+
+        // Heartbeat
+        setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

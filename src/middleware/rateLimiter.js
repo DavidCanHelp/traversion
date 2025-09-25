@@ -44,13 +44,11 @@ class RateLimiter {
       handler: (req, res) => {
         // Log blocked request
         this.logRequest(req, true);
+        console.warn(`Rate limit reached for IP: ${req.ip} on ${req.path}`);
         res.status(429).json({
           error: 'Too many requests from this IP, please try again later.',
           retryAfter: '15 minutes'
         });
-      },
-      onLimitReached: (req) => {
-        console.warn(`Rate limit reached for IP: ${req.ip} on ${req.path}`);
       }
     });
   }

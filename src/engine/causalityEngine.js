@@ -8,7 +8,7 @@
 
 import EventEmitter from 'events';
 
-class CausalityEngine extends EventEmitter {
+export class CausalityEngine extends EventEmitter {
   constructor() {
     super();
     
