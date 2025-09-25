@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,14 +7,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: .5; }
-        }
-        .pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
         }
 
         .card {
@@ -29,11 +24,16 @@
             border-radius: 50%;
             display: inline-block;
             margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
         .status-connected { background: #10b981; }
         .status-disconnected { background: #ef4444; }
-
         .risk-high { background: #ef4444; }
         .risk-medium { background: #f59e0b; }
         .risk-low { background: #10b981; }
@@ -42,31 +42,35 @@
             background: #1a1a1a;
             color: #00ff00;
             font-family: 'Courier New', monospace;
-            padding: 20px;
+            padding: 12px;
             border-radius: 8px;
-            height: 300px;
+            height: 180px;
             overflow-y: auto;
+            font-size: 12px;
         }
 
         .log-entry {
-            margin-bottom: 8px;
+            margin-bottom: 4px;
             opacity: 0;
             animation: fadeIn 0.3s ease-in-out forwards;
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* Ensure full height layout */
+        body { height: 100vh; overflow: hidden; }
     </style>
 </head>
-<body class="gradient-bg min-h-screen text-white">
+<body class="gradient-bg h-full flex flex-col text-white">
     <!-- Header -->
-    <nav class="bg-black bg-opacity-30 backdrop-blur-lg border-b border-white border-opacity-20">
-        <div class="container mx-auto px-6 py-4">
+    <nav class="bg-black bg-opacity-30 backdrop-blur-lg border-b border-white border-opacity-20 flex-shrink-0">
+        <div class="container mx-auto px-4 py-3">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
-                    <h1 class="text-2xl font-bold">🕵️ Traversion</h1>
+                    <h1 class="text-xl font-bold">🕵️ Traversion</h1>
                     <span class="text-sm opacity-75">Real-time Incident Analysis</span>
                 </div>
                 <div class="flex items-center space-x-4">
@@ -74,7 +78,7 @@
                         <span class="status-indicator status-disconnected"></span>
                         <span class="text-sm">Disconnected</span>
                     </div>
-                    <button onclick="connectWebSocket()" class="px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition">
+                    <button onclick="connectWebSocket()" class="px-3 py-1 bg-white bg-opacity-20 rounded hover:bg-opacity-30 transition text-sm">
                         Reconnect
                     </button>
                 </div>
@@ -82,81 +86,79 @@
         </div>
     </nav>
 
-    <!-- Main Dashboard -->
-    <div class="container mx-auto px-6 py-8">
-        <!-- Metrics Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div class="card p-6 rounded-lg">
-                <h3 class="text-sm opacity-75 mb-2">Active Incidents</h3>
-                <p class="text-3xl font-bold" id="active-incidents">0</p>
-                <p class="text-xs mt-2 opacity-75">Last 24 hours</p>
+    <!-- Main Dashboard - Scrollable Content -->
+    <div class="flex-1 overflow-auto">
+        <div class="container mx-auto px-4 py-4">
+            <!-- Metrics Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div class="card p-4 rounded-lg">
+                    <h3 class="text-xs opacity-75 mb-1">Active Incidents</h3>
+                    <p class="text-2xl font-bold" id="active-incidents">0</p>
+                    <p class="text-xs mt-1 opacity-75">Last 24 hours</p>
+                </div>
+
+                <div class="card p-4 rounded-lg">
+                    <h3 class="text-xs opacity-75 mb-1">High Risk</h3>
+                    <p class="text-2xl font-bold text-red-400" id="high-risk">0</p>
+                    <p class="text-xs mt-1 opacity-75">Needs attention</p>
+                </div>
+
+                <div class="card p-4 rounded-lg">
+                    <h3 class="text-xs opacity-75 mb-1">Connected</h3>
+                    <p class="text-2xl font-bold" id="client-count">0</p>
+                    <p class="text-xs mt-1 opacity-75">Real-time</p>
+                </div>
+
+                <div class="card p-4 rounded-lg">
+                    <h3 class="text-xs opacity-75 mb-1">Uptime</h3>
+                    <p class="text-2xl font-bold" id="uptime">0h</p>
+                    <p class="text-xs mt-1 opacity-75">System</p>
+                </div>
             </div>
 
-            <div class="card p-6 rounded-lg">
-                <h3 class="text-sm opacity-75 mb-2">High Risk Commits</h3>
-                <p class="text-3xl font-bold text-red-400" id="high-risk">0</p>
-                <p class="text-xs mt-2 opacity-75">Requires attention</p>
-            </div>
+            <!-- Main Content Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+                <!-- Live Incidents Feed -->
+                <div class="lg:col-span-2 card p-4 rounded-lg">
+                    <h2 class="text-lg font-semibold mb-3 flex items-center">
+                        <span class="status-indicator status-connected mr-2"></span>
+                        Live Incident Feed
+                    </h2>
+                    <div id="incidents-feed" class="space-y-2 max-h-64 overflow-y-auto">
+                        <div class="text-center py-4 opacity-50">
+                            <p class="text-sm">Waiting for incidents...</p>
+                            <p class="text-xs mt-1">Incidents will appear here in real-time</p>
+                        </div>
+                    </div>
+                </div>
 
-            <div class="card p-6 rounded-lg">
-                <h3 class="text-sm opacity-75 mb-2">Connected Clients</h3>
-                <p class="text-3xl font-bold" id="client-count">0</p>
-                <p class="text-xs mt-2 opacity-75">Real-time monitoring</p>
-            </div>
-
-            <div class="card p-6 rounded-lg">
-                <h3 class="text-sm opacity-75 mb-2">System Uptime</h3>
-                <p class="text-3xl font-bold" id="uptime">0h</p>
-                <p class="text-xs mt-2 opacity-75">Since last restart</p>
-            </div>
-        </div>
-
-        <!-- Main Content Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Live Incidents Feed -->
-            <div class="lg:col-span-2 card p-6 rounded-lg">
-                <h2 class="text-xl font-semibold mb-4 flex items-center">
-                    <span class="status-indicator status-connected pulse mr-2"></span>
-                    Live Incident Feed
-                </h2>
-                <div id="incidents-feed" class="space-y-3 max-h-96 overflow-y-auto">
-                    <div class="text-center py-8 opacity-50">
-                        <p>Waiting for incidents...</p>
-                        <p class="text-sm mt-2">Incidents will appear here in real-time</p>
+                <!-- Risk Distribution Chart -->
+                <div class="card p-4 rounded-lg">
+                    <h2 class="text-lg font-semibold mb-3">Risk Distribution</h2>
+                    <div style="height: 200px;">
+                        <canvas id="risk-chart"></canvas>
                     </div>
                 </div>
             </div>
 
-            <!-- Risk Distribution Chart -->
-            <div class="card p-6 rounded-lg">
-                <h2 class="text-xl font-semibold mb-4">Risk Distribution</h2>
-                <canvas id="risk-chart" width="200" height="200"></canvas>
-            </div>
-        </div>
+            <!-- Bottom Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- Git Activity Monitor -->
+                <div class="card p-4 rounded-lg">
+                    <h2 class="text-lg font-semibold mb-3">Git Activity Monitor</h2>
+                    <div id="git-activity" class="space-y-2 max-h-40 overflow-y-auto">
+                        <p class="text-sm opacity-50">Monitoring repository changes...</p>
+                    </div>
+                </div>
 
-        <!-- Git Activity & System Logs -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            <!-- Git Activity Monitor -->
-            <div class="card p-6 rounded-lg">
-                <h2 class="text-xl font-semibold mb-4">Git Activity Monitor</h2>
-                <div id="git-activity" class="space-y-2 max-h-64 overflow-y-auto">
-                    <p class="text-sm opacity-50">Monitoring repository changes...</p>
+                <!-- System Logs -->
+                <div class="card p-4 rounded-lg">
+                    <h2 class="text-lg font-semibold mb-3">System Logs</h2>
+                    <div id="system-logs" class="terminal">
+                        <div class="log-entry">System initialized...</div>
+                    </div>
                 </div>
             </div>
-
-            <!-- System Logs -->
-            <div class="card p-6 rounded-lg">
-                <h2 class="text-xl font-semibold mb-4">System Logs</h2>
-                <div id="system-logs" class="terminal">
-                    <div class="log-entry">System initialized...</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Timeline Chart -->
-        <div class="card p-6 rounded-lg mt-6">
-            <h2 class="text-xl font-semibold mb-4">Incident Timeline (Last 24h)</h2>
-            <canvas id="timeline-chart" height="100"></canvas>
         </div>
     </div>
 
@@ -184,40 +186,11 @@
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        labels: { color: 'white' }
+                        labels: {
+                            color: 'white',
+                            font: { size: 10 }
+                        }
                     }
-                }
-            }
-        });
-
-        const timelineCtx = document.getElementById('timeline-chart').getContext('2d');
-        const timelineChart = new Chart(timelineCtx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Incidents',
-                    data: [],
-                    borderColor: '#667eea',
-                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: {
-                        grid: { color: 'rgba(255,255,255,0.1)' },
-                        ticks: { color: 'white' }
-                    },
-                    y: {
-                        grid: { color: 'rgba(255,255,255,0.1)' },
-                        ticks: { color: 'white' },
-                        beginAtZero: true
-                    }
-                },
-                plugins: {
-                    legend: { labels: { color: 'white' } }
                 }
             }
         });
@@ -226,12 +199,15 @@
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws`;
 
+            console.log('Connecting to WebSocket:', wsUrl);
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
                 console.log('WebSocket connected');
                 updateConnectionStatus(true);
                 addSystemLog('Connected to Traversion server');
+                clearInterval(reconnectInterval);
+                reconnectInterval = null;
 
                 // Subscribe to channels
                 ws.send(JSON.stringify({ type: 'subscribe', data: { channel: 'incidents' } }));
@@ -240,8 +216,12 @@
             };
 
             ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                handleMessage(message);
+                try {
+                    const message = JSON.parse(event.data);
+                    handleMessage(message);
+                } catch (e) {
+                    console.error('Failed to parse message:', e);
+                }
             };
 
             ws.onerror = (error) => {
@@ -259,21 +239,17 @@
         function handleMessage(message) {
             switch(message.type) {
                 case 'connected':
-                    addSystemLog(`Connected: ${message.message}`);
+                    addSystemLog(`Connected: ${message.message || 'Successfully'}`);
                     break;
-
                 case 'new_incident':
                     handleNewIncident(message.data);
                     break;
-
                 case 'metrics':
                     updateMetrics(message.data);
                     break;
-
                 case 'git_change':
                     handleGitChange(message.data);
                     break;
-
                 default:
                     console.log('Unknown message type:', message.type);
             }
@@ -292,71 +268,80 @@
             // Add to feed
             const feed = document.getElementById('incidents-feed');
             const incidentEl = document.createElement('div');
-            incidentEl.className = 'bg-white bg-opacity-10 rounded-lg p-4';
+            incidentEl.className = 'bg-white bg-opacity-10 rounded p-3 text-sm';
 
             const riskClass = incident.topRisk > 0.7 ? 'risk-high' :
                             incident.topRisk > 0.4 ? 'risk-medium' : 'risk-low';
 
             incidentEl.innerHTML = `
-                <div class="flex justify-between items-start mb-2">
-                    <span class="font-semibold">${incident.incidentId}</span>
+                <div class="flex justify-between items-start mb-1">
+                    <span class="font-semibold text-xs">${incident.incidentId}</span>
                     <span class="text-xs opacity-75">${new Date(incident.incidentTime).toLocaleTimeString()}</span>
                 </div>
-                <div class="flex items-center space-x-2 text-sm">
+                <div class="flex items-center space-x-2 text-xs">
                     <span class="status-indicator ${riskClass}"></span>
                     <span>Risk: ${(incident.topRisk * 100).toFixed(0)}%</span>
                     <span class="opacity-75">• ${incident.suspiciousCommits} commits</span>
                 </div>
-                <p class="text-xs mt-2 opacity-75">Analyzed by: ${incident.analyzedBy}</p>
             `;
 
+            // Clear placeholder if present
             if (feed.children[0]?.classList?.contains('text-center')) {
                 feed.innerHTML = '';
             }
 
             feed.insertBefore(incidentEl, feed.firstChild);
 
-            // Update risk chart
+            // Keep only last 10 incidents
+            while (feed.children.length > 10) {
+                feed.removeChild(feed.lastChild);
+            }
+
             updateRiskChart();
-
-            // Update timeline
-            updateTimeline();
-
-            addSystemLog(`New incident detected: ${incident.incidentId}`);
+            addSystemLog(`New incident: ${incident.incidentId}`);
         }
 
         function updateMetrics(data) {
+            if (!data) return;
+
             // Update uptime
-            const hours = Math.floor(data.uptime / 3600);
-            const minutes = Math.floor((data.uptime % 3600) / 60);
-            document.getElementById('uptime').textContent = `${hours}h ${minutes}m`;
+            if (data.uptime) {
+                const hours = Math.floor(data.uptime / 3600);
+                const minutes = Math.floor((data.uptime % 3600) / 60);
+                document.getElementById('uptime').textContent = `${hours}h ${minutes}m`;
+            }
 
             // Update client count
-            document.getElementById('client-count').textContent = data.clients;
-
-            // Update memory usage in logs
-            const memMB = Math.round(data.memory.heapUsed / 1024 / 1024);
-            addSystemLog(`Memory: ${memMB}MB | Clients: ${data.clients}`, 'info');
+            if (data.clients !== undefined) {
+                document.getElementById('client-count').textContent = data.clients;
+            }
         }
 
         function handleGitChange(data) {
+            if (!data) return;
+
             const activity = document.getElementById('git-activity');
 
-            if (data.modified.length > 0 || data.created.length > 0) {
+            if (data.modified?.length > 0 || data.created?.length > 0) {
                 const entry = document.createElement('div');
-                entry.className = 'text-sm p-2 bg-white bg-opacity-10 rounded';
+                entry.className = 'text-xs p-2 bg-white bg-opacity-10 rounded';
                 entry.innerHTML = `
-                    <p class="font-semibold">Branch: ${data.branch}</p>
-                    ${data.modified.length > 0 ? `<p>Modified: ${data.modified.join(', ')}</p>` : ''}
-                    ${data.created.length > 0 ? `<p>Created: ${data.created.join(', ')}</p>` : ''}
-                    <p class="text-xs opacity-75 mt-1">${new Date().toLocaleTimeString()}</p>
+                    <p class="font-semibold">Branch: ${data.branch || 'main'}</p>
+                    ${data.modified?.length > 0 ? `<p>Modified: ${data.modified.slice(0, 3).join(', ')}</p>` : ''}
+                    ${data.created?.length > 0 ? `<p>Created: ${data.created.slice(0, 3).join(', ')}</p>` : ''}
                 `;
 
+                // Clear placeholder if present
                 if (activity.children[0]?.classList?.contains('opacity-50')) {
                     activity.innerHTML = '';
                 }
 
                 activity.insertBefore(entry, activity.firstChild);
+
+                // Keep only last 5 entries
+                while (activity.children.length > 5) {
+                    activity.removeChild(activity.lastChild);
+                }
             }
         }
 
@@ -370,20 +355,6 @@
 
             riskChart.data.datasets[0].data = data;
             riskChart.update();
-        }
-
-        function updateTimeline() {
-            const now = new Date();
-            const label = now.toLocaleTimeString();
-
-            if (timelineChart.data.labels.length > 20) {
-                timelineChart.data.labels.shift();
-                timelineChart.data.datasets[0].data.shift();
-            }
-
-            timelineChart.data.labels.push(label);
-            timelineChart.data.datasets[0].data.push(incidents.length);
-            timelineChart.update();
         }
 
         function updateConnectionStatus(connected) {
@@ -415,8 +386,8 @@
             // Auto-scroll to bottom
             logs.scrollTop = logs.scrollHeight;
 
-            // Limit to 50 logs
-            if (logs.children.length > 50) {
+            // Limit to 20 logs
+            while (logs.children.length > 20) {
                 logs.removeChild(logs.firstChild);
             }
         }
@@ -430,15 +401,36 @@
             }, 5000);
         }
 
-        // Initialize
+        // Initialize connection on page load
         connectWebSocket();
 
-        // Heartbeat
+        // Send heartbeat
         setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'ping' }));
             }
         }, 30000);
+
+        // Demo data for visualization (remove in production)
+        setTimeout(() => {
+            if (incidents.length === 0) {
+                // Add demo incident
+                handleNewIncident({
+                    incidentId: 'DEMO-001',
+                    topRisk: 0.75,
+                    suspiciousCommits: 2,
+                    incidentTime: new Date().toISOString(),
+                    analyzedBy: 'demo'
+                });
+
+                // Add demo metrics
+                updateMetrics({
+                    uptime: 3661,
+                    clients: 1,
+                    memory: { heapUsed: 50000000 }
+                });
+            }
+        }, 2000);
     </script>
 </body>
 </html>
