@@ -6,6 +6,9 @@ import Database from 'better-sqlite3';
 import simpleGit from 'simple-git';
 import { existsSync, mkdirSync } from 'fs';
 import path from 'path';
+import auth from './middleware/auth.js';
+import rateLimiter from './middleware/rateLimiter.js';
+import validation from './middleware/validation.js';
 
 /**
  * Minimal working application
@@ -85,19 +88,28 @@ class TraversionApp {
     // Compression
     this.app.use(compression());
 
+    // Rate limiting
+    this.app.use(rateLimiter.general());
+
     // Body parsing
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
 
+    // Optional auth for logging
+    this.app.use(auth.optionalAuth());
+
     // Request logging
     this.app.use((req, res, next) => {
-      console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
+      console.log(`${new Date().toISOString()} ${req.method} ${req.path} ${req.user ? `[${req.user.username}]` : '[anonymous]'}`);
+      rateLimiter.logRequest(req, false);
       next();
     });
   }
 
   setupRoutes() {
-    // Health check
+    // ===== Public Routes =====
+
+    // Health check (public)
     this.app.get('/health', (req, res) => {
       res.json({
         status: 'healthy',
@@ -105,19 +117,89 @@ class TraversionApp {
       });
     });
 
-    // Basic API info
+    // ===== Authentication Routes =====
+
+    // Register new user
+    this.app.post('/api/auth/register', rateLimiter.auth(), async (req, res) => {
+      try {
+        const { username, email, password } = req.body;
+
+        if (!username || !email || !password) {
+          return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        const user = await auth.register(username, email, password);
+        res.json({ success: true, user });
+
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Login
+    this.app.post('/api/auth/login', rateLimiter.auth(), async (req, res) => {
+      try {
+        const { username, password } = req.body;
+
+        if (!username || !password) {
+          return res.status(400).json({ error: 'Missing credentials' });
+        }
+
+        const result = await auth.login(username, password);
+        res.json({ success: true, ...result });
+
+      } catch (error) {
+        res.status(401).json({ error: error.message });
+      }
+    });
+
+    // Logout
+    this.app.post('/api/auth/logout', auth.requireAuth(), async (req, res) => {
+      try {
+        const token = req.headers.authorization?.slice(7);
+        await auth.logout(token);
+        res.json({ success: true, message: 'Logged out' });
+
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Get current user
+    this.app.get('/api/auth/me', auth.requireAuth(), (req, res) => {
+      res.json({ user: req.user });
+    });
+
+    // Generate API key
+    this.app.post('/api/auth/api-key', auth.requireAuth(), async (req, res) => {
+      try {
+        const { name } = req.body;
+        const apiKey = await auth.generateApiKey(req.user.id, name);
+        res.json({ success: true, apiKey });
+
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // ===== Public API Routes =====
+
+    // Basic API info (public)
     this.app.get('/api/info', (req, res) => {
       res.json({
         app: 'Traversion',
         version: '0.1.0',
         status: 'running',
         uptime: process.uptime(),
-        environment: process.env.NODE_ENV || 'development'
+        environment: process.env.NODE_ENV || 'development',
+        authenticated: !!req.user
       });
     });
 
-    // Git timeline (core feature)
-    this.app.get('/api/timeline', async (req, res) => {
+    // ===== Protected API Routes =====
+
+    // Git timeline (requires authentication)
+    this.app.get('/api/timeline', rateLimiter.read(), auth.requireAuth(), async (req, res) => {
       try {
         const log = await this.git.log({ n: 20 });
 
@@ -143,8 +225,8 @@ class TraversionApp {
       }
     });
 
-    // Incident analysis
-    this.app.post('/api/incident', async (req, res) => {
+    // Incident analysis (requires authentication)
+    this.app.post('/api/incident', rateLimiter.analysis(), auth.requireAuth(), async (req, res) => {
       try {
         const { time, hours = 24 } = req.body;
         const incidentTime = time ? new Date(time) : new Date();
@@ -198,8 +280,8 @@ class TraversionApp {
       }
     });
 
-    // List recent incidents
-    this.app.get('/api/incidents', (req, res) => {
+    // List recent incidents (requires authentication)
+    this.app.get('/api/incidents', rateLimiter.read(), auth.requireAuth(), (req, res) => {
       try {
         const incidents = this.db.prepare(`
           SELECT * FROM incidents
