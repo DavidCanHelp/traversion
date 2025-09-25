@@ -8,8 +8,8 @@
     "trav": "./src/cli/traversion-cli.js"
   },
   "scripts": {
-    "dev": "node -e \"import('./src/security/secureWebInterface.js').then(m => new m.SecureWebInterface(3335).start())\"",
-    "start": "node -e \"import('./src/security/secureWebInterface.js').then(m => new m.SecureWebInterface(3335).start())\"",
+    "dev": "node src/app.js",
+    "start": "node src/app.js",
     "enterprise": "node enterprise-start.js",
     "platform": "node enterprise-start.js",
     "dashboard": "node -e \"import('./src/dashboard/realTimeDashboard.js').then(m => new m.RealTimeDashboard(3340).start())\"",
@@ -29,7 +29,10 @@
     "test:storage": "NODE_OPTIONS=--experimental-vm-modules jest test/unit/storage.test.js",
     "test:legacy": "node test-causality.js",
     "demo:production": "node demo-production.js",
-    "health": "curl -f http://localhost:3333/api/timeline || echo 'Traversion not running'"
+    "health": "curl -f http://localhost:3333/api/timeline || echo 'Traversion not running'",
+    "tracker": "node -e \"import('./src/tracking/deploymentTracker.js').then(m => new m.DeploymentTracker().start())\"",
+    "rollback": "node -e \"import('./src/automation/rollbackGenerator.js').then(m => console.log('Rollback generator loaded'))\"",
+    "feedback": "node -e \"import('./src/learning/feedbackLoop.js').then(m => console.log('Feedback loop system ready'))\""
   },
   "keywords": [
     "incident-response",
@@ -56,6 +59,7 @@
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "diff": "^5.1.0",
+    "dotenv": "^17.2.2",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "form-data": "^4.0.0",
