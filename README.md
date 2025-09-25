@@ -1,10 +1,11 @@
 # 🕵️ Traversion
 
-**Open Source Incident Analysis Platform - Real-time Git forensics for faster incident resolution**
+**Experimental Open Source Incident Analysis Tool - Git forensics with real-time dashboard**
 
-Stop guessing what caused your production incidents. Traversion analyzes your Git history, detects risky commits, and provides real-time insights through a beautiful dashboard interface.
+⚠️ **Early Release / Proof of Concept** - This is a functional prototype demonstrating incident analysis concepts. While it works, it's not battle-tested for production use.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.0.0--alpha-orange)
+![Status](https://img.shields.io/badge/status-experimental-yellow)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
 
@@ -15,6 +16,15 @@ git clone https://github.com/davidcanhelp/traversion && cd traversion && ./setup
 ```
 
 That's it! The setup script handles everything - dependencies, environment, secrets, and database initialization.
+
+## ⚠️ Current Limitations
+
+**This is an alpha release with known limitations:**
+- Limited testing coverage
+- No production hardening
+- Basic error handling
+- Minimal performance optimization
+- Not suitable for critical production systems
 
 ## 🎯 What Problem Does It Solve?
 
@@ -47,7 +57,7 @@ Traversion provides instant answers through:
 - **Historical timeline analysis**
 - **File impact assessment**
 
-### Enterprise-Ready Security
+### Security Features (Experimental)
 - **JWT authentication** with bcrypt hashing
 - **Multi-tier rate limiting** (100/15min default)
 - **Input validation** with Joi schemas
@@ -269,7 +279,14 @@ RATE_LIMIT_MAX=100
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! This project needs help with:
+- Test coverage
+- Error handling improvements
+- Performance optimization
+- Documentation
+- Bug fixes
+
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (if it exists).
 
 ### Development Setup
 ```bash
@@ -307,6 +324,6 @@ Built with powerful open source technologies:
 
 ---
 
-**Stop playing detective with your incidents. Let Traversion do the investigating.**
+**An experimental tool to help with incident analysis - use at your own discretion.**
 
-🔍 *The best open source incident analysis tool - now with real-time monitoring!*
+🔍 *A work-in-progress incident analysis tool with real-time dashboard capabilities.*
