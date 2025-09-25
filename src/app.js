@@ -588,6 +588,73 @@ class TraversionApp {
       }
     });
 
+    // Test endpoint to trigger fake incidents (no auth required for demo)
+    this.app.post('/api/test-incident', (req, res) => {
+      const fakeIncidents = [
+        { risk: 0.85, commits: 3, message: "Critical: Database connection timeout in production", files: ["db/config.js", "server.js"] },
+        { risk: 0.72, commits: 2, message: "Security patch: Authentication bypass vulnerability", files: ["auth/login.js", "middleware/auth.js"] },
+        { risk: 0.45, commits: 5, message: "Performance: Memory leak in user session handling", files: ["sessions/manager.js"] },
+        { risk: 0.92, commits: 1, message: "Emergency: Payment processing failure", files: ["payment/stripe.js", "payment/handler.js"] },
+        { risk: 0.30, commits: 4, message: "Minor: UI text alignment issues", files: ["components/header.js"] },
+        { risk: 0.68, commits: 2, message: "API rate limiting misconfiguration", files: ["middleware/rateLimit.js"] },
+        { risk: 0.55, commits: 3, message: "Cache invalidation bug causing stale data", files: ["cache/redis.js"] }
+      ];
+
+      // Pick a random fake incident
+      const randomIncident = fakeIncidents[Math.floor(Math.random() * fakeIncidents.length)];
+
+      // Create incident data
+      const incident = {
+        incidentId: `INC-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+        topRisk: randomIncident.risk,
+        suspiciousCommits: randomIncident.commits,
+        message: randomIncident.message,
+        affectedFiles: randomIncident.files,
+        incidentTime: new Date().toISOString(),
+        analyzedBy: 'test-trigger',
+        status: randomIncident.risk > 0.7 ? 'critical' : randomIncident.risk > 0.4 ? 'warning' : 'info'
+      };
+
+      // Broadcast to all WebSocket clients
+      this.broadcast({
+        type: 'new_incident',
+        data: incident
+      });
+
+      // Also trigger a fake git change
+      setTimeout(() => {
+        this.broadcast({
+          type: 'git_change',
+          data: {
+            branch: 'main',
+            modified: randomIncident.files,
+            created: [],
+            author: 'test-user',
+            message: `Investigating: ${randomIncident.message}`
+          }
+        });
+      }, 500);
+
+      // Send metrics update
+      setTimeout(() => {
+        this.broadcast({
+          type: 'metrics',
+          data: {
+            uptime: process.uptime(),
+            clients: this.wsClients.size,
+            memory: process.memoryUsage(),
+            incidents: this.wsClients.size > 0 ? Math.floor(Math.random() * 10) + 1 : 0
+          }
+        });
+      }, 1000);
+
+      res.json({
+        success: true,
+        incident,
+        message: 'Test incident triggered and broadcast to all clients'
+      });
+    });
+
     // Serve static files (including dashboard)
     this.app.use('/public', express.static('public'));
 
